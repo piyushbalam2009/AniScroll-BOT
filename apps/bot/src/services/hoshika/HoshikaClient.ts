@@ -79,6 +79,7 @@ export class HoshikaClient {
 
         if (res.status === 429) {
           const retryAfter = Number(res.headers.get('retry-after') || '2');
+          log.warn({ endpoint: cleanPath, status: res.status, attempt, retryAfter }, 'Hoshika API rate limited');
           if (attempt <= maxRetries) {
             await this.sleep(Math.min(retryAfter * 1000, 5000));
             continue;
@@ -100,6 +101,7 @@ export class HoshikaClient {
 
         if (!res.ok || (body && body.ok === false)) {
           const code = body?.code || `http_${res.status}`;
+          log.warn({ endpoint: cleanPath, status: res.status, code, attempt }, 'Hoshika HTTP error response');
           if (res.status === 404 || code === 'not_found') {
             throw new AppError(ERROR_CODES.ANIME_NOT_FOUND, 'Anime not found on Hoshika.', 404);
           }

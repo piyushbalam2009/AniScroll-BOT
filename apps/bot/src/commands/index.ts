@@ -3,6 +3,7 @@ import { botAdminCommand } from './admin/bot';
 import { configCommand } from './admin/config';
 import { welcomeCommand } from './admin/welcome';
 import { animeCommand } from './anime/anime';
+import { aniguessCommand } from './anime/aniguess';
 import { animeEntertainmentCommands } from './anime/entertainment';
 import { watchlistCommand } from './watchlist/watchlist';
 import { musicCommands } from './music/music';
@@ -15,6 +16,7 @@ export function buildCommandRegistry(): Map<string, BotSlashCommand> {
     configCommand,
     welcomeCommand,
     animeCommand,
+    aniguessCommand,
     ...animeEntertainmentCommands,
     watchlistCommand,
     ...musicCommands,

@@ -4,11 +4,13 @@ import { CacheService } from '../services/cache/CacheService';
 import { AnimeService } from '../services/hoshika/AnimeService';
 import { MusicService } from '../services/music/MusicService';
 import { WebsiteWatchlistService } from '../services/watchlist/WebsiteWatchlistService';
+import { AniGuessService } from '../services/anime/AniGuessService';
 
 export interface BotCommandContext {
   db: AniScrollDatabase;
   cache: CacheService;
   animeService: AnimeService;
+  aniGuessService?: AniGuessService;
   musicService: MusicService;
   websiteWatchlist: WebsiteWatchlistService;
   maintenanceMode: boolean;

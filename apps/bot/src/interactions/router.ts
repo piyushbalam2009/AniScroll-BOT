@@ -3,6 +3,7 @@ import {
   ChatInputCommandInteraction,
   GuildMember,
   Interaction,
+  ModalSubmitInteraction,
   StringSelectMenuInteraction,
 } from 'discord.js';
 import {
@@ -33,6 +34,7 @@ import {
 } from '../commands/watchlist/watchlist';
 import { assertMusicControlAccess, musicSearchSessions } from '../commands/music/music';
 import { formatDuration } from '../services/music/MusicService';
+import { getAniGuessService } from '../services/anime/AniGuessService';
 
 const log = createModuleLogger('InteractionRouter');
 
@@ -48,6 +50,8 @@ export async function handleInteraction(
       await handleButton(interaction, ctx);
     } else if (interaction.isStringSelectMenu()) {
       await handleSelectMenu(interaction, ctx);
+    } else if (typeof interaction.isModalSubmit === 'function' && interaction.isModalSubmit()) {
+      await handleModalSubmit(interaction, ctx);
     }
   } catch (err) {
     const userMessage =
@@ -135,6 +139,23 @@ async function handleSlashCommand(
 async function handleButton(interaction: ButtonInteraction, ctx: BotCommandContext) {
   const parts = interaction.customId.split(':');
   const domain = parts[0];
+
+  if (domain === 'aniguess') {
+    const action = parts[1];
+    const ownerUserId = parts[2];
+    const aniGuess = ctx.aniGuessService || getAniGuessService(ctx.animeService);
+
+    if (action === 'playagain') {
+      await aniGuess.handlePlayAgainButton(interaction, ownerUserId);
+      return;
+    }
+
+    if (action === 'openmodal') {
+      const gameId = parts[3];
+      await aniGuess.handleOpenAnswerModalButton(interaction, ownerUserId, gameId);
+      return;
+    }
+  }
 
   if (domain === 'anime') {
     const action = parts[1];
@@ -643,5 +664,14 @@ async function handleSelectMenu(interaction: StringSelectMenuInteraction, ctx: B
     if (position === 0) {
       ctx.musicService.setNowPlayingMessage(interaction.guildId, msg as any);
     }
+  }
+}
+
+async function handleModalSubmit(interaction: ModalSubmitInteraction, ctx: BotCommandContext) {
+  const parts = interaction.customId.split(':');
+  const [domain, action, ownerUserId, gameId] = parts;
+  if (domain === 'aniguess' && action === 'submit') {
+    const aniGuess = ctx.aniGuessService || getAniGuessService(ctx.animeService);
+    await aniGuess.handleAnswerModalSubmit(interaction, ownerUserId, gameId);
   }
 }

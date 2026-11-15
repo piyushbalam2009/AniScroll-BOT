@@ -186,7 +186,25 @@ export interface NormalizedAnime {
     coverImage?: string | null;
     averageScore?: number | null;
   }>;
+  characters?: NormalizedAnimeCharacterRef[];
   sourceUpdatedAt?: string | null;
+}
+
+export interface NormalizedAnimeCharacterRef {
+  id: string;
+  name: string;
+  role?: string | null;
+  avatar?: string | null;
+}
+
+export interface CharacterGuessCandidate {
+  characterId: string;
+  characterName: string;
+  alternativeNames: string[];
+  characterImageUrl: string;
+  animeShortId: number;
+  animeTitle: string;
+  role?: string | null;
 }
 
 export interface NormalizedEpisode {
@@ -205,6 +223,7 @@ export interface NormalizedCharacter {
   id: string;
   name: string;
   nativeName?: string | null;
+  alternativeNames?: string[];
   image?: string | null;
   description?: string | null;
   appearances: Array<{

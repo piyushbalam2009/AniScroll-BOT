@@ -800,5 +800,184 @@ export function createWelcomeEmbed(options: CreateWelcomeEmbedOptions) {
   return embed;
 }
 
+export const ANI_GUESS_TOTAL_ROUNDS = 10;
+export const ANI_GUESS_ROUND_SECONDS = 30;
+
+export function getAniGuessTierMessage(score: number, totalRounds = ANI_GUESS_TOTAL_ROUNDS): string {
+  const safeTotal = totalRounds > 0 ? totalRounds : ANI_GUESS_TOTAL_ROUNDS;
+  const normalizedTen = Math.round((score / safeTotal) * 10);
+  if (normalizedTen >= 10) return '🏆 Character Master!';
+  if (normalizedTen >= 8) return '🔥 Anime Expert!';
+  if (normalizedTen >= 5) return '⭐ Anime Fan!';
+  if (normalizedTen >= 3) return '🌱 Anime Beginner!';
+  return '💪 Keep Practicing!';
+}
+
+export function createAniGuessRoundEmbed(options: {
+  roundNumber: number;
+  totalRounds: number;
+  score: number;
+  characterImageUrl: string;
+  roundSeconds?: number;
+  hasMessageContentIntent?: boolean;
+}) {
+  const roundSeconds = options.roundSeconds ?? ANI_GUESS_ROUND_SECONDS;
+  const instructionsText =
+    options.hasMessageContentIntent === false
+      ? 'Click **Submit Answer** below or tag the bot (`@Aniscroll <character name>`).\n*(Plain channel messages require **Message Content Intent** in the Discord Developer Portal.)*'
+      : 'Type the character name in this channel (or click **Submit Answer** below).';
+
+  const embed = createMonochromeEmbed({
+    title: '🌸 AniScroll Character Guess',
+    description: 'Who is this anime character?',
+    footerText: `AniScroll Character Guess · Round ${options.roundNumber}/${options.totalRounds} · ${roundSeconds}s timer`,
+  });
+
+  if (/^https?:\/\//i.test(options.characterImageUrl)) {
+    embed.setImage(options.characterImageUrl);
+  }
+
+  embed.addFields(
+    {
+      name: 'Current round',
+      value: `${options.roundNumber}/${options.totalRounds}`,
+      inline: true,
+    },
+    {
+      name: 'Current score',
+      value: `${options.score}/${options.totalRounds}`,
+      inline: true,
+    },
+    {
+      name: 'Timer',
+      value: `${roundSeconds} seconds`,
+      inline: true,
+    },
+    {
+      name: 'Instructions',
+      value: instructionsText,
+      inline: false,
+    }
+  );
+
+  return embed;
+}
+
+export function buildAniGuessRoundRow(options: { userId: string; gameId: string }) {
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`aniguess:openmodal:${options.userId}:${options.gameId}`)
+      .setLabel('Submit Answer')
+      .setStyle(ButtonStyle.Secondary)
+  );
+}
+
+export function createAniGuessCorrectEmbed(options: {
+  roundNumber: number;
+  totalRounds: number;
+  score: number;
+  revealedCharacterName: string;
+  revealedAnimeTitle: string;
+  nextRoundUpcoming: boolean;
+}) {
+  const nextLine = options.nextRoundUpcoming
+    ? `Advancing to Round ${options.roundNumber + 1}/${options.totalRounds}...`
+    : 'All rounds complete! Tallying your final score...';
+
+  return createMonochromeEmbed({
+    title: '✅ Correct!',
+    description: `Round ${options.roundNumber}/${options.totalRounds} — **+1 point!**\nCharacter: **${options.revealedCharacterName}**\nAnime: **${options.revealedAnimeTitle}**\n\n${nextLine}`,
+    color: BRAND_THEME.success,
+    footerText: `AniScroll Character Guess · Score ${options.score}/${options.totalRounds}`,
+  }).addFields({
+    name: 'Current score',
+    value: `${options.score}/${options.totalRounds}`,
+    inline: true,
+  });
+}
+
+export function createAniGuessTimeoutEmbed(options: {
+  roundNumber: number;
+  totalRounds: number;
+  score: number;
+  revealedCharacterName: string;
+  revealedAnimeTitle: string;
+  nextRoundUpcoming: boolean;
+}) {
+  const nextLine = options.nextRoundUpcoming
+    ? `Advancing to Round ${options.roundNumber + 1}/${options.totalRounds}...`
+    : 'All rounds complete! Tallying your final score...';
+
+  return createMonochromeEmbed({
+    title: "⏰ Time's Up!",
+    description: `Round ${options.roundNumber}/${options.totalRounds} — **0 points**\nThe character was **${options.revealedCharacterName}** from **${options.revealedAnimeTitle}**.\n\n${nextLine}`,
+    color: BRAND_THEME.warning,
+    footerText: `AniScroll Character Guess · Score ${options.score}/${options.totalRounds}`,
+  }).addFields({
+    name: 'Current score',
+    value: `${options.score}/${options.totalRounds}`,
+    inline: true,
+  });
+}
+
+export function createAniGuessResultsEmbed(options: {
+  userId: string;
+  username?: string;
+  score: number;
+  totalRounds: number;
+}) {
+  const totalRounds = Math.max(1, options.totalRounds);
+  const score = Math.max(0, Math.min(totalRounds, options.score));
+  const incorrect = totalRounds - score;
+  const percentage = Math.round((score / totalRounds) * 100);
+  const tierMessage = getAniGuessTierMessage(score, totalRounds);
+  const playerLabel = options.username
+    ? `${options.username} (<@${options.userId}>)`
+    : `<@${options.userId}>`;
+
+  return createMonochromeEmbed({
+    title: '🌸 ANI GUESS RESULTS',
+    description: `**${tierMessage}**`,
+    color: score >= Math.ceil(totalRounds / 2) ? BRAND_THEME.success : BRAND_THEME.embedHex,
+    footerText: 'AniScroll Character Guess · Click Play Again for a fresh 10-round game',
+  }).addFields(
+    {
+      name: 'Player',
+      value: playerLabel,
+      inline: true,
+    },
+    {
+      name: 'Correct Answers',
+      value: `${score}`,
+      inline: true,
+    },
+    {
+      name: 'Incorrect Answers',
+      value: `${incorrect}`,
+      inline: true,
+    },
+    {
+      name: 'Score',
+      value: `${score}/${totalRounds}`,
+      inline: true,
+    },
+    {
+      name: 'Percentage',
+      value: `${percentage}%`,
+      inline: true,
+    }
+  );
+}
+
+export function buildAniGuessPlayAgainRow(userId: string) {
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`aniguess:playagain:${userId}`)
+      .setLabel('Play Again')
+      .setStyle(ButtonStyle.Primary)
+  );
+}
+
+
 
 

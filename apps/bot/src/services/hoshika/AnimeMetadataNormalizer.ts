@@ -75,6 +75,16 @@ export class AnimeMetadataNormalizer {
     if (data.titleRomaji) altSet.add(data.titleRomaji);
     if (data.titleJapanese) altSet.add(data.titleJapanese);
     if (data.titleLocalized) altSet.add(data.titleLocalized);
+    if (Array.isArray(data.synonyms)) {
+      for (const syn of data.synonyms) {
+        if (typeof syn === 'string' && syn.trim()) altSet.add(syn.trim());
+      }
+    }
+    if (Array.isArray(data.alternativeTitles)) {
+      for (const alt of data.alternativeTitles) {
+        if (typeof alt === 'string' && alt.trim()) altSet.add(alt.trim());
+      }
+    }
     const primaryTitle = data.titleEnglish || data.titleRomaji || data.titleLocalized || '';
     altSet.delete(primaryTitle);
 
@@ -157,6 +167,14 @@ export class AnimeMetadataNormalizer {
           averageScore: rec.averageScore ?? null,
         };
       }),
+      characters: (detailData?.characters || [])
+        .filter((c) => Boolean(c?.id && c?.name))
+        .map((c) => ({
+          id: String(c.id),
+          name: String(c.name).trim(),
+          role: c.role ?? null,
+          avatar: c.avatar ?? null,
+        })),
       sourceUpdatedAt: new Date().toISOString(),
     };
   }
@@ -180,14 +198,32 @@ export class AnimeMetadataNormalizer {
 
   public static normalizeCharacter(raw: any): NormalizedCharacter {
     const ch = raw?.character || raw;
+    const rawAppearances =
+      raw?.appearances?.anime ||
+      ch?.appearances?.anime ||
+      (Array.isArray(ch?.appearances) ? ch.appearances : null) ||
+      (Array.isArray(raw?.appearances) ? raw.appearances : []);
+
+    const altNames = new Set<string>();
+    for (const field of ['alternativeNames', 'aliases', 'nicknames', 'otherNames']) {
+      if (Array.isArray(ch?.[field])) {
+        for (const entry of ch[field]) {
+          if (typeof entry === 'string' && entry.trim()) {
+            altNames.add(entry.trim());
+          }
+        }
+      }
+    }
+
     return {
-      id: String(ch.id),
-      name: ch.name || 'Unknown Character',
-      nativeName: ch.nativeName || ch.sub || null,
-      image: ch.image || ch.avatar || null,
-      description: ch.description || ch.bio || null,
-      appearances: Array.isArray(ch.appearances || raw?.appearances)
-        ? (ch.appearances || raw.appearances).map((a: any) => ({
+      id: String(ch?.id ?? ''),
+      name: ch?.name || 'Unknown Character',
+      nativeName: ch?.nativeName || ch?.nameJapanese || ch?.sub || null,
+      alternativeNames: Array.from(altNames),
+      image: ch?.avatarUrl || ch?.image || ch?.avatar || null,
+      description: ch?.description || ch?.bio || null,
+      appearances: Array.isArray(rawAppearances)
+        ? rawAppearances.map((a: any) => ({
             shortId: a.shortId ?? a.anime?.shortId,
             title: a.title || a.anime?.titleEnglish || a.anime?.titleRomaji || 'Unknown',
             role: a.role ?? null,

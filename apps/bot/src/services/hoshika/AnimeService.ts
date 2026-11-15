@@ -2,9 +2,11 @@ import {
   appConfig,
   AppError,
   buildAniScrollAnimeUrl,
+  CharacterGuessCandidate,
   createModuleLogger,
   ERROR_CODES,
   NormalizedAnime,
+  NormalizedCharacter,
   normalizeHoshikaShortId,
 } from '../../../../../packages/shared/src';
 import { HoshikaClient } from './HoshikaClient';
@@ -486,6 +488,449 @@ export class AnimeService {
     }
     const hydrated = await this.hydrateAnimeItem(picked, locale);
     return hydrated.anime;
+  }
+
+  public async getRandomGuessPool(options?: {
+    count?: number;
+    excludeShortIds?: number[];
+    locale?: string;
+  }): Promise<NormalizedAnime[]> {
+    const count = Math.max(1, Math.min(25, options?.count ?? 10));
+    const locale = options?.locale || 'en';
+    const excluded = new Set<number>(options?.excludeShortIds || []);
+    const candidatesByShortId = new Map<number, NormalizedAnime>();
+
+    let skippedInvalid = 0;
+    const isValidHttpUrl = (value: string | null | undefined): boolean => {
+      if (!value || !/^https?:\/\//i.test(value)) return false;
+      try {
+        const parsed = new URL(value);
+        return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+      } catch {
+        return false;
+      }
+    };
+
+    const collectValid = (rawItems: unknown[] | undefined) => {
+      if (!Array.isArray(rawItems)) return;
+      for (const raw of rawItems) {
+        try {
+          const item = AnimeMetadataNormalizer.normalizeAnime(raw);
+          const sid = normalizeHoshikaShortId(item.shortId);
+          if (!sid || excluded.has(sid) || candidatesByShortId.has(sid)) continue;
+          if (!item.titleEnglish || !item.titleEnglish.trim()) {
+            skippedInvalid++;
+            continue;
+          }
+          if (!isValidHttpUrl(item.poster)) {
+            skippedInvalid++;
+            continue;
+          }
+          this.identifiers.remember(item);
+          candidatesByShortId.set(sid, item);
+        } catch {
+          skippedInvalid++;
+        }
+      }
+    };
+
+    const discoverOffsets = [0, 15, 30, 45, 60, 75, 90, 105, 120, 135];
+    const pickedOffsets = [...discoverOffsets].sort(() => Math.random() - 0.5).slice(0, 2);
+    const browseSorts: Array<'top' | 'trending'> =
+      Math.random() < 0.5 ? ['top', 'trending'] : ['trending', 'top'];
+
+    const primaryResults = await Promise.allSettled([
+      this.client.get<{ ok: boolean; items?: unknown[] }>('/discover', {
+        params: { offset: pickedOffsets[0] },
+      }),
+      this.client.get<{ ok: boolean; items?: unknown[] }>('/discover', {
+        params: { offset: pickedOffsets[1] },
+      }),
+      this.client.get<{ ok: boolean; items?: unknown[] }>('/browse', {
+        params: { type: 'anime', sort: browseSorts[0], locale },
+      }),
+    ]);
+
+    let lastError: unknown = null;
+    for (const res of primaryResults) {
+      if (res.status === 'fulfilled') {
+        collectValid(res.value.items);
+      } else {
+        lastError = res.reason;
+        log.warn(
+          { err: res.reason instanceof Error ? res.reason.message : String(res.reason) },
+          'Hoshika guess pool source request failed'
+        );
+      }
+    }
+
+    if (skippedInvalid > 0) {
+      log.debug({ skippedInvalid, validCount: candidatesByShortId.size }, 'Filtered incomplete Hoshika guess pool entries');
+    }
+
+    if (candidatesByShortId.size < count) {
+      try {
+        const extraBrowse = await this.client.get<{ ok: boolean; items?: unknown[] }>('/browse', {
+          params: { type: 'anime', sort: browseSorts[1], locale },
+        });
+        collectValid(extraBrowse.items);
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    if (candidatesByShortId.size < count) {
+      const randomPage = Math.floor(Math.random() * 12) + 1;
+      try {
+        const catalogRes = await this.client.get<{ ok: boolean; items?: unknown[] }>('/catalog', {
+          params: { type: 'anime', page: randomPage, locale },
+        });
+        collectValid(catalogRes.items);
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    if (candidatesByShortId.size < count && excluded.size > 0) {
+      // Allow previously played anime only if fresh unplayed candidates are exhausted
+      const allowReuse = Array.from(excluded);
+      excluded.clear();
+      for (const res of primaryResults) {
+        if (res.status === 'fulfilled') {
+          collectValid(res.value.items);
+        }
+      }
+      if (candidatesByShortId.size < count && allowReuse.length > 0) {
+        try {
+          const fallbackBrowse = await this.client.get<{ ok: boolean; items?: unknown[] }>('/browse', {
+            params: { type: 'anime', sort: 'top', locale },
+          });
+          collectValid(fallbackBrowse.items);
+        } catch (err) {
+          lastError = err;
+        }
+      }
+    }
+
+    const pool = Array.from(candidatesByShortId.values());
+    if (pool.length === 0) {
+      if (lastError instanceof AppError) {
+        throw lastError;
+      }
+      throw new AppError(
+        ERROR_CODES.HOSHIKA_UNAVAILABLE,
+        'Could not fetch random anime from Hoshika right now. Please try again in a moment.',
+        503
+      );
+    }
+
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+
+    return pool.slice(0, count);
+  }
+
+  public async getCharacterDetails(
+    characterId: string,
+    locale = 'en'
+  ): Promise<NormalizedCharacter> {
+    const cleanId = (characterId || '').trim();
+    if (!cleanId) {
+      throw new AppError(ERROR_CODES.VALIDATION_ERROR, 'Character ID cannot be empty.', 400);
+    }
+    const raw = await this.client.get<unknown>(`/character/${encodeURIComponent(cleanId)}`, {
+      params: { locale },
+    });
+    return AnimeMetadataNormalizer.normalizeCharacter(raw);
+  }
+
+  public async getRandomCharacterGuessPool(options?: {
+    count?: number;
+    excludeCharacterIds?: string[];
+    locale?: string;
+  }): Promise<CharacterGuessCandidate[]> {
+    const count = Math.max(1, Math.min(25, options?.count ?? 10));
+    const locale = options?.locale || 'en';
+    const excluded = new Set<string>(options?.excludeCharacterIds || []);
+
+    const isValidCharacterImageUrl = (
+      url: string | null | undefined,
+      anime?: NormalizedAnime | null
+    ): url is string => {
+      if (!url || !/^https?:\/\//i.test(url)) return false;
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false;
+        const lower = parsed.pathname.toLowerCase();
+        if (
+          lower.includes('questionmark') ||
+          lower.includes('placeholder') ||
+          lower.includes('no_image') ||
+          lower.includes('no-image') ||
+          /\/default\.(?:png|jpe?g|webp|gif)$/i.test(lower)
+        ) {
+          return false;
+        }
+        if (anime?.poster && url === anime.poster) return false;
+        if (anime?.banner && url === anime.banner) return false;
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const animeByShortId = new Map<number, NormalizedAnime>();
+    const collectAnime = (rawItems: unknown[] | undefined) => {
+      if (!Array.isArray(rawItems)) return;
+      for (const raw of rawItems) {
+        try {
+          const item = AnimeMetadataNormalizer.normalizeAnime(raw);
+          const sid = normalizeHoshikaShortId(item.shortId);
+          if (!sid || animeByShortId.has(sid)) continue;
+          const animeTitle = item.titleEnglish?.trim() || item.titleRomaji?.trim();
+          if (!animeTitle) continue;
+          this.identifiers.remember(item);
+          animeByShortId.set(sid, item);
+        } catch {
+          // Skip malformed entries
+        }
+      }
+    };
+
+    const discoverOffsets = [0, 15, 30, 45, 60, 75, 90, 105, 120, 135];
+    const pickedOffsets = [...discoverOffsets].sort(() => Math.random() - 0.5).slice(0, 2);
+    const browseSorts: Array<'top' | 'trending'> =
+      Math.random() < 0.5 ? ['top', 'trending'] : ['trending', 'top'];
+
+    const sourceResponses = await Promise.allSettled([
+      this.client.get<{ ok: boolean; items?: unknown[] }>('/browse', {
+        params: { type: 'anime', sort: browseSorts[0], locale },
+      }),
+      this.client.get<{ ok: boolean; items?: unknown[] }>('/discover', {
+        params: { offset: pickedOffsets[0] },
+      }),
+      this.client.get<{ ok: boolean; items?: unknown[] }>('/discover', {
+        params: { offset: pickedOffsets[1] },
+      }),
+    ]);
+
+    let lastError: unknown = null;
+    for (const res of sourceResponses) {
+      if (res.status === 'fulfilled') {
+        collectAnime(res.value.items);
+      } else {
+        lastError = res.reason;
+        log.warn(
+          { err: res.reason instanceof Error ? res.reason.message : String(res.reason) },
+          'Hoshika character pool anime discovery request failed'
+        );
+      }
+    }
+
+    if (animeByShortId.size < count * 2) {
+      try {
+        const extraBrowse = await this.client.get<{ ok: boolean; items?: unknown[] }>('/browse', {
+          params: { type: 'anime', sort: browseSorts[1], locale },
+        });
+        collectAnime(extraBrowse.items);
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    if (animeByShortId.size < count * 2) {
+      const randomPage = Math.floor(Math.random() * 10) + 1;
+      try {
+        const catalogRes = await this.client.get<{ ok: boolean; items?: unknown[] }>('/catalog', {
+          params: { type: 'anime', page: randomPage, locale },
+        });
+        collectAnime(catalogRes.items);
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    const animePool = Array.from(animeByShortId.values());
+    if (animePool.length === 0) {
+      if (lastError instanceof AppError) throw lastError;
+      throw new AppError(
+        ERROR_CODES.HOSHIKA_UNAVAILABLE,
+        'Could not fetch anime character sources from Hoshika right now. Please try again in a moment.',
+        503
+      );
+    }
+
+    // Shuffle anime pool and inspect anime details in batches until we have `count` distinct characters
+    for (let i = animePool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [animePool[i], animePool[j]] = [animePool[j], animePool[i]];
+    }
+
+    interface PreliminaryPick {
+      characterId: string;
+      rawName: string;
+      avatarUrl: string;
+      role: string | null;
+      animeShortId: number;
+      animeTitle: string;
+      anime: NormalizedAnime;
+    }
+
+    const pickedByCharId = new Map<string, PreliminaryPick>();
+    const fallbackPicks: PreliminaryPick[] = [];
+    const batchSize = 6;
+
+    for (let idx = 0; idx < animePool.length && pickedByCharId.size < count; idx += batchSize) {
+      const batch = animePool.slice(idx, idx + batchSize);
+      const detailResults = await Promise.allSettled(
+        batch.map((item) => this.getDetails(item.shortId!, locale))
+      );
+
+      for (const res of detailResults) {
+        if (pickedByCharId.size >= count) break;
+        if (res.status !== 'fulfilled') {
+          lastError = res.reason;
+          continue;
+        }
+        const detailed = res.value.anime;
+        const sid = normalizeHoshikaShortId(detailed.shortId);
+        const animeTitle =
+          detailed.titleEnglish?.trim() || detailed.titleRomaji?.trim() || detailed.titleNative?.trim();
+        if (!sid || !animeTitle || !Array.isArray(detailed.characters) || detailed.characters.length === 0) {
+          continue;
+        }
+
+        const validChars = detailed.characters.filter(
+          (ch) =>
+            Boolean(ch.id) &&
+            Boolean(ch.name?.trim()) &&
+            /[a-zA-Z]/.test(ch.name) &&
+            isValidCharacterImageUrl(ch.avatar, detailed)
+        );
+        if (validChars.length === 0) continue;
+
+        const mainChars = validChars.filter((c) => (c.role || '').toUpperCase() === 'MAIN');
+        const preferredPool = mainChars.length > 0 ? mainChars : validChars;
+        const shuffledChars = [...preferredPool].sort(() => Math.random() - 0.5);
+
+        let chosenThisAnime = false;
+        for (const ch of shuffledChars) {
+          if (pickedByCharId.has(ch.id)) continue;
+          const candidate: PreliminaryPick = {
+            characterId: ch.id,
+            rawName: ch.name.trim(),
+            avatarUrl: ch.avatar!,
+            role: ch.role ?? null,
+            animeShortId: sid,
+            animeTitle,
+            anime: detailed,
+          };
+          if (excluded.has(ch.id)) {
+            fallbackPicks.push(candidate);
+            continue;
+          }
+          pickedByCharId.set(ch.id, candidate);
+          chosenThisAnime = true;
+          break;
+        }
+
+        if (!chosenThisAnime && mainChars.length > 0 && validChars.length > mainChars.length) {
+          const supporting = validChars.filter((c) => (c.role || '').toUpperCase() !== 'MAIN');
+          for (const ch of supporting.sort(() => Math.random() - 0.5)) {
+            if (pickedByCharId.has(ch.id) || excluded.has(ch.id)) continue;
+            pickedByCharId.set(ch.id, {
+              characterId: ch.id,
+              rawName: ch.name.trim(),
+              avatarUrl: ch.avatar!,
+              role: ch.role ?? null,
+              animeShortId: sid,
+              animeTitle,
+              anime: detailed,
+            });
+            break;
+          }
+        }
+      }
+    }
+
+    // Reuse excluded characters only if fresh ones couldn't fill `count`
+    if (pickedByCharId.size < count) {
+      for (const fb of fallbackPicks) {
+        if (pickedByCharId.size >= count) break;
+        if (!pickedByCharId.has(fb.characterId)) {
+          pickedByCharId.set(fb.characterId, fb);
+        }
+      }
+    }
+
+    const preliminary = Array.from(pickedByCharId.values()).slice(0, count);
+    if (preliminary.length === 0) {
+      if (lastError instanceof AppError) throw lastError;
+      throw new AppError(
+        ERROR_CODES.HOSHIKA_UNAVAILABLE,
+        'Could not gather anime characters with valid character images from Hoshika right now.',
+        503
+      );
+    }
+
+    // Hydrate selected characters with GET /api/v1/character/{id}?locale=en for canonical names, avatars, and appearances
+    const detailResults = await Promise.allSettled(
+      preliminary.map((pick) => this.getCharacterDetails(pick.characterId, locale))
+    );
+
+    const candidates: CharacterGuessCandidate[] = [];
+    for (let i = 0; i < preliminary.length; i++) {
+      const pick = preliminary[i];
+      const detRes = detailResults[i];
+      let canonicalName = pick.rawName;
+      let finalAvatar = pick.avatarUrl;
+      let animeTitle = pick.animeTitle;
+      const altSet = new Set<string>([pick.rawName]);
+
+      if (detRes.status === 'fulfilled') {
+        const det = detRes.value;
+        if (det.name && /[a-zA-Z]/.test(det.name)) {
+          canonicalName = det.name.trim();
+          altSet.add(canonicalName);
+        }
+        if (Array.isArray(det.alternativeNames)) {
+          for (const alt of det.alternativeNames) {
+            if (alt && /[a-zA-Z]/.test(alt)) altSet.add(alt.trim());
+          }
+        }
+        if (isValidCharacterImageUrl(det.image, pick.anime)) {
+          finalAvatar = det.image;
+        }
+        const matchedAppearance = det.appearances.find((a) => a.shortId === pick.animeShortId);
+        if (matchedAppearance?.title && matchedAppearance.title !== 'Unknown') {
+          animeTitle = matchedAppearance.title;
+        }
+      }
+
+      if (!isValidCharacterImageUrl(finalAvatar, pick.anime)) {
+        continue;
+      }
+
+      candidates.push({
+        characterId: pick.characterId,
+        characterName: canonicalName,
+        alternativeNames: Array.from(altSet),
+        characterImageUrl: finalAvatar,
+        animeShortId: pick.animeShortId,
+        animeTitle,
+        role: pick.role,
+      });
+    }
+
+    // Shuffle final candidates so order isn't tied to batch resolution
+    for (let i = candidates.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+    }
+
+    return candidates;
   }
 
   public async searchCharacters(query: string) {

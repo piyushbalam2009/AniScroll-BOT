@@ -53,47 +53,6 @@ export const animeEntertainmentCommands: BotSlashCommand[] = [
     },
   },
   {
-    name: 'aniquiz',
-    category: 'anime',
-    cooldownSeconds: 8,
-    data: new SlashCommandBuilder()
-      .setName('aniquiz')
-      .setDescription('Start an anime trivia challenge from Hoshika metadata')
-      .addStringOption((o) =>
-        o
-          .setName('difficulty')
-          .setDescription('Trivia difficulty')
-          .addChoices(
-            { name: 'Standard', value: 'standard' },
-            { name: 'Hard', value: 'hard' }
-          )
-      ),
-    async execute(interaction, ctx) {
-      await interaction.deferReply();
-      const { items } = await ctx.animeService.getTrending('trending', 'en');
-      const pool = items.filter((a) => a.synopsis && (a.titleEnglish || a.titleRomaji));
-      if (pool.length === 0) {
-        await interaction.editReply({ embeds: [createErrorEmbed('Quiz pool is temporarily empty.')] });
-        return;
-      }
-      const pick = pool[Math.floor(Math.random() * pool.length)];
-      const answer = pick.titleEnglish || pick.titleRomaji || 'Unknown';
-      const maskedSynopsis = (pick.synopsis || '').replace(new RegExp(answer.split(' ')[0], 'gi'), '[REDACTED]');
-      await interaction.editReply({
-        embeds: [
-          createMonochromeEmbed({
-            title: 'Anime Trivia Challenge',
-            description: `Guess the anime from its synopsis:\n\n${maskedSynopsis.slice(0, 420)}...`,
-          }).addFields(
-            { name: 'Genres', value: pick.genres.slice(0, 4).join(' · ') || 'Unknown', inline: true },
-            { name: 'Release Year', value: String(pick.releaseYear ?? 'Unknown'), inline: true },
-            { name: 'Answer Reveal', value: `||${answer}||`, inline: false }
-          ),
-        ],
-      });
-    },
-  },
-  {
     name: 'profile',
     category: 'community',
     cooldownSeconds: 4,

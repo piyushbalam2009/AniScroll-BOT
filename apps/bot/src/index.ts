@@ -9,10 +9,14 @@ import { getAnimeServices } from './services/hoshika';
 import { SchedulerService } from './services/jobs/SchedulerService';
 import { getMusicService } from './services/music/MusicService';
 import { getWebsiteWatchlistService } from './services/watchlist/WebsiteWatchlistService';
+import { AniGuessService, getAniGuessService } from './services/anime/AniGuessService';
 
 const log = createModuleLogger('BotRuntime');
 
-export function getGatewayIntents(includePrivileged: boolean): GatewayIntentBits[] {
+export function getGatewayIntents(
+  includePrivileged: boolean,
+  includeMessageContent = false
+): GatewayIntentBits[] {
   const base = [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
@@ -20,6 +24,9 @@ export function getGatewayIntents(includePrivileged: boolean): GatewayIntentBits
   ];
   if (includePrivileged) {
     base.push(GatewayIntentBits.GuildMembers);
+  }
+  if (includeMessageContent) {
+    base.push(GatewayIntentBits.MessageContent);
   }
   return base;
 }
@@ -44,8 +51,10 @@ export class AniScrollBotRuntime {
   public intentWarning: string | null = null;
   public privilegedIntentsActive = false;
   public eventsRegistered = false;
+  public lastCommandSync: (SlashCommandSyncResult & { syncedAt: string; error?: string | null }) | null = null;
   private scheduler = new SchedulerService();
   private commands = buildCommandRegistry();
+  private aniGuessService: AniGuessService | null = null;
 
   public getDiagnostics() {
     const bitfield = this.client?.options?.intents
@@ -53,6 +62,7 @@ export class AniScrollBotRuntime {
       : null;
     const enabledIntents = bitfield ? bitfield.toArray() : [];
     const hasGuildMembersIntent = Boolean(bitfield?.has(GatewayIntentBits.GuildMembers));
+    const hasMessageContentIntent = Boolean(bitfield?.has(GatewayIntentBits.MessageContent));
     const guildMemberAddListenerCount = this.client
       ? this.client.listenerCount(Events.GuildMemberAdd)
       : 0;
@@ -69,11 +79,13 @@ export class AniScrollBotRuntime {
       maintenanceMode: this.maintenanceMode,
       privilegedIntentsActive: this.privilegedIntentsActive,
       hasGuildMembersIntent,
+      hasMessageContentIntent,
       enabledIntents,
       eventsRegistered: this.eventsRegistered,
       guildMemberAddListenerCount,
       intentWarning: this.intentWarning,
       lastError: this.lastError,
+      lastCommandSync: this.lastCommandSync,
       commands: Array.from(this.commands.values()).map((c) => ({
         name: c.name,
         category: c.category,
@@ -82,8 +94,39 @@ export class AniScrollBotRuntime {
     };
   }
 
-  private buildConfiguredClient(includePrivileged: boolean): Client {
-    const requestedIntents = getGatewayIntents(includePrivileged);
+  public async fetchLiveDiscordCommands() {
+    const applicationId =
+      this.client?.application?.id || this.client?.user?.id || appConfig.DISCORD_CLIENT_ID || null;
+    if (!appConfig.DISCORD_TOKEN || !applicationId) {
+      return { ok: false, reason: 'Bot token or application ID missing', global: [], guilds: {} };
+    }
+    const rest = new REST({ version: '10' }).setToken(appConfig.DISCORD_TOKEN);
+    const globalCmds = (await rest.get(Routes.applicationCommands(applicationId))) as Array<{
+      id: string;
+      name: string;
+      type?: number;
+      handler?: number;
+    }>;
+    const guilds: Record<string, Array<{ id: string; name: string; type?: number }>> = {};
+    const knownGuildIds = this.client ? Array.from(this.client.guilds.cache.keys()) : [];
+    for (const gid of knownGuildIds) {
+      const gCmds = (await rest.get(Routes.applicationGuildCommands(applicationId, gid)).catch(() => [])) as Array<{
+        id: string;
+        name: string;
+        type?: number;
+      }>;
+      guilds[gid] = (gCmds || []).map((c) => ({ id: c.id, name: c.name, type: c.type }));
+    }
+    return {
+      ok: true,
+      applicationId,
+      global: (globalCmds || []).map((c) => ({ id: c.id, name: c.name, type: c.type, handler: c.handler })),
+      guilds,
+    };
+  }
+
+  private buildConfiguredClient(includePrivileged: boolean, includeMessageContent = false): Client {
+    const requestedIntents = getGatewayIntents(includePrivileged, includeMessageContent);
     const client = new Client({
       intents: requestedIntents,
     });
@@ -92,10 +135,12 @@ export class AniScrollBotRuntime {
     log.info(
       {
         includePrivileged,
+        includeMessageContent,
         privilegedIntentsMode: appConfig.DISCORD_PRIVILEGED_INTENTS,
         enabledIntents: intentNames,
         hasGuildsIntent: new IntentsBitField(client.options.intents).has(GatewayIntentBits.Guilds),
         hasGuildMembersIntent: new IntentsBitField(client.options.intents).has(GatewayIntentBits.GuildMembers),
+        hasMessageContentIntent: new IntentsBitField(client.options.intents).has(GatewayIntentBits.MessageContent),
       },
       'Configured Discord Client gateway intents'
     );
@@ -103,6 +148,8 @@ export class AniScrollBotRuntime {
     const db = getDatabase();
     const cache = getCacheService();
     const { animeService } = getAnimeServices();
+    const aniGuessService = getAniGuessService(animeService);
+    this.aniGuessService = aniGuessService;
     const musicService = getMusicService();
     const websiteWatchlist = getWebsiteWatchlistService();
 
@@ -110,6 +157,7 @@ export class AniScrollBotRuntime {
       db,
       cache,
       animeService,
+      aniGuessService,
       musicService,
       websiteWatchlist,
       maintenanceMode: this.maintenanceMode,
@@ -130,7 +178,7 @@ export class AniScrollBotRuntime {
       const clientIntents = new IntentsBitField(client.options.intents);
       const hasGuildMembers = clientIntents.has(GatewayIntentBits.GuildMembers);
       this.privilegedIntentsActive = includePrivileged && hasGuildMembers;
-      if (this.privilegedIntentsActive) {
+      if (this.privilegedIntentsActive && includeMessageContent) {
         this.intentWarning = null;
       }
 
@@ -173,9 +221,19 @@ export class AniScrollBotRuntime {
         },
         'Discord bot logged in'
       );
-      await this.registerSlashCommands().catch((err) =>
-        log.warn({ err: String(err) }, 'Slash command registration warning')
-      );
+      await this.registerSlashCommands().catch((err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.lastCommandSync = {
+          synced: false,
+          applicationId: client.application?.id || client.user?.id || null,
+          globalCommandCount: 0,
+          updatedGuildIds: [],
+          cleanedStaleGuildIds: [],
+          syncedAt: new Date().toISOString(),
+          error: msg,
+        };
+        log.warn({ err: msg }, 'Slash command registration warning');
+      });
       this.scheduler.start(client);
     });
 
@@ -235,32 +293,49 @@ export class AniScrollBotRuntime {
       this.intentWarning =
         'DISCORD_PRIVILEGED_INTENTS=false disables GatewayIntentBits.GuildMembers; guildMemberAdd events will not fire.';
     }
-    const primaryClient = this.buildConfiguredClient(tryPrivilegedFirst);
+    const primaryClient = this.buildConfiguredClient(tryPrivilegedFirst, tryPrivilegedFirst);
     this.client = primaryClient;
 
     try {
       await primaryClient.login(appConfig.DISCORD_TOKEN);
     } catch (err) {
-      if (
-        tryPrivilegedFirst &&
-        appConfig.DISCORD_PRIVILEGED_INTENTS === 'auto' &&
-        isDisallowedIntentsError(err)
-      ) {
-        const warning =
-          'Server Members Intent (GatewayIntentBits.GuildMembers) was rejected by Discord (code 4014). Enable Application -> Bot -> Privileged Gateway Intents -> Server Members Intent in the Discord Developer Portal so member join welcome messages work. Running fallback without GuildMembers.';
-        this.intentWarning = warning;
-        log.error({ err: err instanceof Error ? err.message : String(err) }, warning);
+      if (tryPrivilegedFirst && isDisallowedIntentsError(err)) {
+        // Step 1 fallback: keep GuildMembers active even if MessageContent is not yet enabled in Developer Portal
+        const msgContentWarn =
+          'Message Content Intent (GatewayIntentBits.MessageContent) was rejected by Discord (code 4014). Keeping Server Members Intent active; /aniguess supports @mention and Submit Answer modal fallback until Message Content Intent is enabled in the Discord Developer Portal.';
+        this.intentWarning = msgContentWarn;
+        log.warn({ err: err instanceof Error ? err.message : String(err) }, msgContentWarn);
         await primaryClient.destroy().catch(() => undefined);
 
-        const fallbackClient = this.buildConfiguredClient(false);
-        this.client = fallbackClient;
+        const membersOnlyClient = this.buildConfiguredClient(true, false);
+        this.client = membersOnlyClient;
         try {
-          await fallbackClient.login(appConfig.DISCORD_TOKEN);
+          await membersOnlyClient.login(appConfig.DISCORD_TOKEN);
           return;
-        } catch (fallbackErr) {
+        } catch (membersErr) {
+          if (appConfig.DISCORD_PRIVILEGED_INTENTS === 'auto' && isDisallowedIntentsError(membersErr)) {
+            const warning =
+              'Server Members Intent (GatewayIntentBits.GuildMembers) was rejected by Discord (code 4014). Enable Application -> Bot -> Privileged Gateway Intents -> Server Members Intent in the Discord Developer Portal so member join welcome messages work. Running fallback without GuildMembers.';
+            this.intentWarning = warning;
+            log.error({ err: membersErr instanceof Error ? membersErr.message : String(membersErr) }, warning);
+            await membersOnlyClient.destroy().catch(() => undefined);
+
+            const fallbackClient = this.buildConfiguredClient(false, false);
+            this.client = fallbackClient;
+            try {
+              await fallbackClient.login(appConfig.DISCORD_TOKEN);
+              return;
+            } catch (fallbackErr) {
+              this.status = 'error';
+              this.lastError = fallbackErr instanceof Error ? fallbackErr.message : 'Login failed';
+              log.error({ err: this.lastError }, 'Discord login failed after fallback');
+              return;
+            }
+          }
+
           this.status = 'error';
-          this.lastError = fallbackErr instanceof Error ? fallbackErr.message : 'Login failed';
-          log.error({ err: this.lastError }, 'Discord login failed after fallback');
+          this.lastError = membersErr instanceof Error ? membersErr.message : 'Login failed';
+          log.error({ err: this.lastError }, 'Discord login failed');
           return;
         }
       }
@@ -275,17 +350,24 @@ export class AniScrollBotRuntime {
     const applicationId =
       this.client?.application?.id || this.client?.user?.id || appConfig.DISCORD_CLIENT_ID;
     const knownGuildIds = this.client ? Array.from(this.client.guilds.cache.keys()) : [];
-    return synchronizeDiscordSlashCommands({
+    const result = await synchronizeDiscordSlashCommands({
       token: appConfig.DISCORD_TOKEN,
       applicationId,
       devGuildId: appConfig.DISCORD_DEV_GUILD_ID,
       knownGuildIds,
       commands: this.commands,
     });
+    this.lastCommandSync = {
+      ...result,
+      syncedAt: new Date().toISOString(),
+      error: result.reason ?? null,
+    };
+    return result;
   }
 
   public async stop() {
     this.scheduler.stop();
+    this.aniGuessService?.disposeAll();
     if (this.client) {
       await this.client.destroy();
     }
@@ -337,9 +419,48 @@ export async function synchronizeDiscordSlashCommands(options?: {
 
   const body = Array.from(commandMap.values()).map((c) => c.data.toJSON());
 
-  // 1. Always synchronize global application commands so removed subcommands (like /anime recommendations) are deleted globally
-  await rest.put(Routes.applicationCommands(applicationId), { body });
-  log.info({ count: body.length, applicationId }, 'Synchronized global Discord slash commands');
+  // 1. Preserve any Discord Activity / Entry Point commands (type === 4) so Discord bulk PUT does not reject
+  let globalBody: any[] = [...body];
+  if (typeof rest.get === 'function') {
+    try {
+      const existingGlobalCmds = (await rest.get(Routes.applicationCommands(applicationId))) as
+        | Array<Record<string, any>>
+        | undefined;
+      if (Array.isArray(existingGlobalCmds)) {
+        const entryPointCommands = existingGlobalCmds
+          .filter((cmd) => cmd && cmd.type === 4)
+          .map((cmd) => {
+            const preserved: Record<string, any> = {
+              id: cmd.id,
+              name: cmd.name,
+              description: cmd.description,
+              type: cmd.type,
+            };
+            if (cmd.handler !== undefined) preserved.handler = cmd.handler;
+            if (cmd.integration_types !== undefined) preserved.integration_types = cmd.integration_types;
+            if (cmd.contexts !== undefined) preserved.contexts = cmd.contexts;
+            if (cmd.name_localizations !== undefined) preserved.name_localizations = cmd.name_localizations;
+            if (cmd.description_localizations !== undefined) {
+              preserved.description_localizations = cmd.description_localizations;
+            }
+            return preserved;
+          });
+        if (entryPointCommands.length > 0) {
+          globalBody = [...body, ...entryPointCommands];
+          log.info(
+            { entryPointCount: entryPointCommands.length, names: entryPointCommands.map((c) => c.name) },
+            'Preserved Discord Entry Point command(s) in global slash command sync'
+          );
+        }
+      }
+    } catch (err) {
+      log.warn({ err: String(err) }, 'Could not inspect existing global commands before bulk sync');
+    }
+  }
+
+  // Always synchronize global application commands so removed commands (/aniquiz, /recommendations) are deleted globally
+  await rest.put(Routes.applicationCommands(applicationId), { body: globalBody });
+  log.info({ count: globalBody.length, slashCount: body.length, applicationId }, 'Synchronized global Discord slash commands');
 
   const updatedGuildIds: string[] = [];
   const cleanedStaleGuildIds: string[] = [];
@@ -378,19 +499,27 @@ export async function synchronizeDiscordSlashCommands(options?: {
         )) as Array<{ id: string; name: string; options?: Array<{ name: string }> }> | undefined;
 
         if (Array.isArray(existingGuildCmds) && existingGuildCmds.length > 0) {
-          const hasStaleAnimeOrRecs = existingGuildCmds.some(
-            (cmd) =>
-              cmd.name === 'recommendations' ||
-              (cmd.name === 'anime' &&
-                Array.isArray(cmd.options) &&
-                cmd.options.some((opt) => opt.name === 'recommendations'))
-          );
-          if (hasStaleAnimeOrRecs) {
+          const existingNames = new Set(existingGuildCmds.map((c) => c.name));
+          const expectedNames = new Set(body.map((c: { name: string }) => c.name));
+          const namesMismatch =
+            existingNames.size !== expectedNames.size ||
+            Array.from(expectedNames).some((name) => !existingNames.has(name));
+          const hasStaleCommands =
+            namesMismatch ||
+            existingGuildCmds.some(
+              (cmd) =>
+                cmd.name === 'recommendations' ||
+                cmd.name === 'aniquiz' ||
+                (cmd.name === 'anime' &&
+                  Array.isArray(cmd.options) &&
+                  cmd.options.some((opt) => opt.name === 'recommendations'))
+            );
+          if (hasStaleCommands) {
             await rest.put(Routes.applicationGuildCommands(applicationId, guildId), { body });
             cleanedStaleGuildIds.push(guildId);
             log.info(
               { guildId, count: body.length },
-              'Replaced stale guild slash commands containing obsolete /anime recommendations'
+              'Synchronized mismatched or stale guild slash commands'
             );
           }
         }

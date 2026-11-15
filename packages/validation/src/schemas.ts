@@ -20,6 +20,8 @@ export const hoshikaAnimeSummarySchema = z.object({
   titleEnglish: z.string().nullable().optional(),
   titleJapanese: z.string().nullable().optional(),
   titleLocalized: z.string().nullable().optional(),
+  synonyms: z.array(z.string()).optional(),
+  alternativeTitles: z.array(z.string()).optional(),
   synopsis: z.string().nullable().optional(),
   coverImage: z.string().nullable().optional(),
   bannerImage: z.string().nullable().optional(),
@@ -84,6 +86,17 @@ export const hoshikaAnimeDetailSchema = hoshikaAnimeSummarySchema.extend({
         coverImage: z.string().nullable().optional(),
         format: z.string().nullable().optional(),
         averageScore: z.number().nullable().optional(),
+      })
+    )
+    .optional()
+    .default([]),
+  characters: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string().nullable().optional(),
+        role: z.string().nullable().optional(),
+        avatar: z.string().nullable().optional(),
       })
     )
     .optional()

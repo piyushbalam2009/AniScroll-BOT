@@ -98,11 +98,13 @@ export function createApiV1Router(): Router {
         commandCount: bot.commandCount,
         privilegedIntentsActive: bot.privilegedIntentsActive,
         hasGuildMembersIntent: bot.hasGuildMembersIntent,
+        hasMessageContentIntent: bot.hasMessageContentIntent,
         enabledIntents: bot.enabledIntents,
         eventsRegistered: bot.eventsRegistered,
         guildMemberAddListenerCount: bot.guildMemberAddListenerCount,
         intentWarning: bot.intentWarning,
         lastError: bot.lastError,
+        lastCommandSync: bot.lastCommandSync,
         commands: bot.commands,
       },
       oauthCallbackRoute: DISCORD_OAUTH_CALLBACK_ROUTE,
@@ -111,6 +113,15 @@ export function createApiV1Router(): Router {
       redirectUriWarning: redirectResolution.warning,
       botInviteUrl: clientId ? buildDiscordBotInviteUrl(clientId) : null,
     });
+  });
+
+  router.get('/discord/commands', async (_req, res, next) => {
+    try {
+      const live = await getBotRuntime().fetchLiveDiscordCommands();
+      res.json(live);
+    } catch (err) {
+      next(err);
+    }
   });
 
   // ==================== AUTHENTICATION ====================

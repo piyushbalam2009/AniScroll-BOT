@@ -39,6 +39,7 @@ test('Discord command registry registers all required modules and valid slash JS
     'config',
     'welcome',
     'anime',
+    'aniguess',
     'watchlist',
     'play',
     'pause',
@@ -82,8 +83,9 @@ test('Discord command registry registers all required modules and valid slash JS
   }
   assert.equal(registry.get('bot')?.ownerOnly, true);
 
-  // Verify obsolete top-level /recommendations command does not exist
+  // Verify obsolete /recommendations and /aniquiz commands do not exist
   assert.equal(registry.has('recommendations'), false);
+  assert.equal(registry.has('aniquiz'), false);
 
   // Verify /anime subcommands: keep /anime recommendation and ensure /anime recommendations is removed
   const animeJson = registry.get('anime')!.data.toJSON();
@@ -135,6 +137,17 @@ test('Discord command registry registers all required modules and valid slash JS
         return opts.body;
       },
       get: async (route) => {
+        if (route === Routes.applicationCommands('app-12345')) {
+          return [
+            {
+              id: 'entry-point-1',
+              name: 'launch',
+              description: 'Launch Activity',
+              type: 4,
+              handler: 2,
+            },
+          ];
+        }
         if (route === Routes.applicationGuildCommands('app-12345', 'stale-guild-2')) {
           return [
             {
@@ -155,7 +168,10 @@ test('Discord command registry registers all required modules and valid slash JS
   assert.deepEqual(syncResult.cleanedStaleGuildIds, ['stale-guild-2']);
   assert.equal(putCalls.length, 3);
   assert.equal(putCalls[0].route, Routes.applicationCommands('app-12345'));
+  assert.equal(putCalls[0].body.length, registry.size + 1);
+  assert.equal(putCalls[0].body.some((c: any) => c.type === 4 && c.name === 'launch'), true);
   assert.equal(putCalls[1].route, Routes.applicationGuildCommands('app-12345', 'dev-guild-1'));
+  assert.equal(putCalls[1].body.length, registry.size);
   assert.equal(putCalls[2].route, Routes.applicationGuildCommands('app-12345', 'stale-guild-2'));
 });
 

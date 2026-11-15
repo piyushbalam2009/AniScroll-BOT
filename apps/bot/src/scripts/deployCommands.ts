@@ -23,6 +23,12 @@ export async function runCommandDeployment() {
   if (payload.some((c) => c.name === 'recommendations')) {
     throw new Error('Obsolete top-level /recommendations command is still present in registry.');
   }
+  if (!payload.some((c) => c.name === 'aniguess')) {
+    throw new Error('Missing /aniguess command in registry.');
+  }
+  if (payload.some((c) => c.name === 'aniquiz')) {
+    throw new Error('Obsolete /aniquiz command is still present in registry.');
+  }
 
   const recSub = (animeCmd.options || []).find((o: any) => o.name === 'recommendation') as any;
   log.info(

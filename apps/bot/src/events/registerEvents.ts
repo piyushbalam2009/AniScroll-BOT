@@ -165,7 +165,20 @@ export function registerDiscordEvents(
   });
 
   client.on(Events.MessageCreate, async (message: Message) => {
-    if (message.author.bot || !message.guildId || !message.guild) return;
+    if (message.author.bot) return;
+
+    if (ctx.aniGuessService) {
+      const handledByAniGuess = await ctx.aniGuessService.handleMessage(message).catch((err) => {
+        log.warn(
+          { channelId: message.channelId, userId: message.author.id, err: err instanceof Error ? err.message : String(err) },
+          'AniGuess message handler error'
+        );
+        return false;
+      });
+      if (handledByAniGuess) return;
+    }
+
+    if (!message.guildId || !message.guild) return;
 
     const settings = ctx.db.getGuildSettings(message.guildId);
     const memberRoleIds = message.member?.roles.cache.map((r) => r.id) || [];
