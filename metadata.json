@@ -1,0 +1,6 @@
+{
+  "name": "AniScroll Bot",
+  "description": "All-in-one Discord community management, Hoshika anime discovery, personal watchlists, Lavalink v4 music, moderation, and monochrome web dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

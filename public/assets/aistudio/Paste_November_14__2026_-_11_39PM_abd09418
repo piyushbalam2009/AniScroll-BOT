@@ -1,0 +1,2321 @@
+MASTER DEVELOPMENT PROMPT — ANISCROLL BOT
+
+You are a senior full-stack software architect, Discord bot engineer, backend developer, database engineer, UI/UX designer and DevOps engineer.
+
+Build a complete, production-ready application called AniScroll Bot.
+
+This is not a simple Discord bot. It is an all-in-one Discord community management, anime discovery, music playback, moderation and entertainment platform with its own professional web dashboard.
+
+The product should combine the functionality of Dyno, Carl-bot and Discord music bots while adding deep integration with the AniScroll anime ecosystem.
+
+Do not create a mockup, prototype, static interface or incomplete demonstration. Build functional software with real database persistence, working Discord interactions, real API integrations, error handling and deployment configuration.
+
+Do not leave buttons nonfunctional or replace real features with hardcoded demonstration data.
+
+If external credentials or services are unavailable, implement the complete integration structure, configuration, error handling and setup instructions. Never pretend an integration is working when it has not been connected.
+
+1. PROJECT IDENTITY
+
+Product name: AniScroll Bot
+
+Brand identity:
+
+Minimal black and white.
+
+Premium, modern and professional.
+
+Anime-inspired but not visually cluttered.
+
+Consistent branding between Discord embeds and the management website.
+
+Brand colors:
+
+Background: #000000
+
+Primary surface: #111111
+
+Secondary surface: #181818
+
+Elevated surface: #222222
+
+Primary text: #FFFFFF
+
+Secondary text: #A0A0A0
+
+Border: #2A2A2A
+
+Success: restrained green.
+
+Warning: restrained amber.
+
+Error: restrained red.
+
+Design requirements:
+
+Minimal monochrome appearance.
+
+Clean typography.
+
+Consistent spacing.
+
+Subtle transitions.
+
+Rounded but not excessively rounded cards.
+
+Responsive website.
+
+Excellent desktop and mobile layouts.
+
+Accessible contrast.
+
+Dark theme as the default.
+
+Avoid unnecessary gradients, colorful backgrounds and excessive animations.
+
+Create an original AniScroll Bot logo consistent with the AniScroll brand.
+
+2. STRICT ARCHITECTURE RULES
+
+This is a completely separate project from the existing AniScroll website.
+
+Existing external services:
+
+Hoshika API for anime metadata.
+
+Existing AniScroll API at https://api.aniscroll.in for compatible existing streaming integration only.
+
+Discord API for Discord functionality.
+
+Lavalink for music playback.
+
+IMPORTANT ARCHITECTURE DECISIONS:
+
+A. Direct Hoshika integration
+
+The bot must communicate directly with Hoshika for anime metadata.
+
+Do not proxy anime metadata through api.aniscroll.in.
+
+Do not duplicate Hoshika integration in the existing AniScroll website.
+
+Use a dedicated Hoshika service module in the bot.
+
+Hoshika API credentials must be stored in environment variables and never exposed to the browser or Discord messages.
+
+Before implementation, inspect the supplied Hoshika documentation and confirm the actual endpoints, request parameters, authentication method and response schemas.
+
+Do not invent endpoints or assume undocumented response fields.
+
+B. Existing AniScroll API
+
+Use https://api.aniscroll.in only for existing compatible AniScroll functionality, such as website links and streaming integration where required.
+
+Never modify the existing website backend.
+
+Never create new routes or endpoints in the existing AniScroll website.
+
+Never change its database.
+
+Never assume that an endpoint exists without checking its documentation or testing it.
+
+C. Independent project
+
+Build a separate:
+
+Discord bot.
+
+Backend services.
+
+PostgreSQL database.
+
+Redis cache.
+
+Next.js dashboard.
+
+Authentication system.
+
+Configuration system.
+
+D. Explicit exclusions
+
+Do not integrate AniSkip.
+
+Do not retrieve or display official streaming availability from Hoshika.
+
+Do not build an anime streaming player inside Discord.
+
+Do not expose Hoshika credentials.
+
+Do not create unnecessary dependencies on other anime databases.
+
+Do not modify existing AniScroll backend code.
+
+3. TECHNOLOGY STACK
+
+Use the following technologies.
+
+Backend:
+
+Node.js.
+
+TypeScript.
+
+Discord.js.
+
+Zod for validation.
+
+REST API for dashboard communication.
+
+Modular service architecture.
+
+Discord:
+
+Discord.js.
+
+Slash commands.
+
+Buttons.
+
+Select menus.
+
+Modals.
+
+Gateway events.
+
+Discord voice support.
+
+Database:
+
+PostgreSQL.
+
+Prisma ORM.
+
+Proper migrations.
+
+Database indexing.
+
+Foreign keys.
+
+Unique constraints.
+
+Caching:
+
+Redis.
+
+Anime metadata caching.
+
+Search result caching.
+
+Rate limiting.
+
+Temporary interaction state.
+
+Scheduled jobs.
+
+Music:
+
+Lavalink v4.
+
+Compatible Discord.js Lavalink client.
+
+Authorized and compatible audio-source integrations.
+
+Website:
+
+Next.js.
+
+TypeScript.
+
+React.
+
+Tailwind CSS.
+
+Accessible reusable components.
+
+Server-side API integration.
+
+Authentication:
+
+Discord OAuth2.
+
+Secure server-side sessions.
+
+Permission verification.
+
+Secure cookie configuration.
+
+Testing:
+
+Vitest or Jest.
+
+Integration testing.
+
+Discord command validation.
+
+API testing.
+
+Database testing.
+
+Deployment:
+
+Docker.
+
+Docker Compose.
+
+Environment configuration.
+
+Health checks.
+
+Structured logging.
+
+Use compatible, maintained library versions. Pin dependencies and document version requirements.
+
+4. DISCORD BOT FOUNDATION
+
+Create a complete Discord application.
+
+Features:
+
+Bot login.
+
+Slash-command registration.
+
+Guild-specific configuration.
+
+Global command support.
+
+Interaction routing.
+
+Permission checking.
+
+Error handling.
+
+Command cooldowns.
+
+Rate limiting.
+
+Reusable embed builder.
+
+Reusable pagination system.
+
+Button interactions.
+
+Select menus.
+
+Modal handling.
+
+Persistent interaction state.
+
+Graceful shutdown.
+
+Automatic reconnection handling.
+
+Structured logs.
+
+Organize commands by modules.
+
+Commands must have:
+
+Name.
+
+Description.
+
+Options.
+
+Permission requirements.
+
+Cooldown.
+
+Execution handler.
+
+Error handler.
+
+Logging.
+
+Validation.
+
+Create an owner-only developer command group.
+
+Developer commands:
+
+/bot info
+
+/bot status
+
+/bot ping
+
+/bot diagnostics
+
+/bot reload
+
+/bot maintenance
+
+/bot cache clear
+
+Do not expose sensitive diagnostics or environment variables to ordinary members.
+
+5. ANIME METADATA INTEGRATION — HOSHIKA
+
+This is a core feature.
+
+Integrate Hoshika directly inside AniScroll Bot.
+
+Create:
+
+HoshikaClient.
+
+AnimeService.
+
+AnimeSearchService.
+
+AnimeMetadataNormalizer.
+
+AnimeCacheService.
+
+AnimeIdentifierService.
+
+The Hoshika client must:
+
+Use the documented base URL.
+
+Use the documented authentication method.
+
+Handle timeouts.
+
+Handle rate limits.
+
+Retry appropriate transient failures.
+
+Validate responses.
+
+Normalize metadata.
+
+Cache responses.
+
+Log errors without leaking credentials.
+
+Use Hoshika as the primary metadata source.
+
+Do not retrieve official streaming availability from Hoshika.
+
+Do not display official Hoshika streaming providers.
+
+Anime search must support:
+
+English titles.
+
+Japanese titles.
+
+Alternative titles.
+
+Partial matching.
+
+Search pagination.
+
+Genre filters.
+
+Release year filters.
+
+Anime type filters.
+
+Status filters.
+
+Empty results.
+
+Multiple matching results.
+
+Search suggestions.
+
+Implement the following commands:
+
+/anime search
+/anime details
+/anime trending
+/anime popular
+/anime random
+/anime genres
+/anime season
+/anime schedule
+/anime episodes
+/anime related
+/anime recommendations
+/anime watch
+
+Only implement endpoints confirmed in Hoshika documentation.
+
+If a particular data source or endpoint is unavailable, show a graceful unsupported-feature response.
+
+Anime search experience:
+
+When someone executes:
+
+/anime search Naruto
+
+The bot should:
+
+Validate the query.
+
+Check Redis cache.
+
+Query Hoshika when necessary.
+
+Normalize the returned results.
+
+Display attractive Discord embeds.
+
+Include anime poster when available.
+
+Display title.
+
+Display alternative titles where available.
+
+Display synopsis.
+
+Display genres.
+
+Display release year.
+
+Display anime type.
+
+Display episode count when available.
+
+Display available metadata ratings only when supplied by Hoshika.
+
+Display a link to the AniScroll website when a compatible URL can be constructed and verified.
+
+If multiple anime match:
+
+Display paginated results.
+
+Use previous and next buttons.
+
+Provide a selection menu.
+
+Prevent unauthorized users from controlling another user's interaction.
+
+Expire old interactions safely.
+
+Create a normalized anime metadata model.
+
+Suggested fields:
+
+anilistId.
+
+malId.
+
+hoshikaId.
+
+titleEnglish.
+
+titleRomaji.
+
+titleNative.
+
+alternativeTitles.
+
+synopsis.
+
+poster.
+
+banner.
+
+genres.
+
+releaseYear.
+
+season.
+
+type.
+
+status.
+
+totalEpisodes.
+
+rating.
+
+sourceUpdatedAt.
+
+Do not assume every field is available. Use optional fields and validate actual API responses.
+
+Preserve the mapping between Hoshika IDs, AniList IDs and MAL IDs when returned by the API.
+
+6. ANIME DISCOVERY EXPERIENCE
+
+Build a full anime discovery system.
+
+Features:
+
+Trending anime.
+
+Popular anime.
+
+Random anime.
+
+Seasonal anime.
+
+Genre browsing.
+
+Similar anime.
+
+Anime recommendations.
+
+Anime release schedules.
+
+Anime detail cards.
+
+Search pagination.
+
+Related anime exploration.
+
+Use interactive Discord embeds.
+
+Example buttons:
+
+Details.
+
+Episodes.
+
+Related anime.
+
+Add to watchlist.
+
+Open AniScroll.
+
+Ensure the interaction is accessible only to the intended user where appropriate.
+
+7. PERSONAL ANIME WATCHLIST
+
+Build a fully functional personal watchlist.
+
+All watchlists must be stored in the bot's own PostgreSQL database.
+
+Do not require AniScroll website backend changes.
+
+Commands:
+
+/watchlist add
+/watchlist remove
+/watchlist show
+/watchlist search
+/watchlist status
+/watchlist stats
+/watchlist progress
+/watchlist export
+
+Watch status categories:
+
+Plan to Watch.
+
+Watching.
+
+Completed.
+
+On Hold.
+
+Dropped.
+
+Add functionality:
+
+Add anime.
+
+Remove anime.
+
+Prevent duplicates.
+
+Change status.
+
+Track episodes watched.
+
+Personal ratings.
+
+Personal notes.
+
+Sort by title.
+
+Sort by date added.
+
+Filter by genre.
+
+Filter by status.
+
+Paginate large watchlists.
+
+Export data.
+
+Private watchlist by default.
+
+Optional public sharing.
+
+Watchlist statistics.
+
+When adding an anime:
+
+Search Hoshika.
+
+Let the user select the correct anime.
+
+Check for duplicates.
+
+Save the anime identifier and metadata snapshot.
+
+Assign the initial status Plan to Watch.
+
+Confirm the operation.
+
+When updating progress:
+
+Validate episode numbers.
+
+Do not exceed the known episode count.
+
+Handle unknown episode counts.
+
+Automatically mark Completed when appropriate, but allow manual confirmation.
+
+Preserve progress when status changes.
+
+Create a unique database constraint on Discord user ID and anime ID.
+
+Watchlist database fields:
+
+id.
+
+discordUserId.
+
+hoshikaId.
+
+anilistId.
+
+malId.
+
+titleSnapshot.
+
+posterSnapshot.
+
+status.
+
+episodesWatched.
+
+personalRating.
+
+notes.
+
+createdAt.
+
+updatedAt.
+
+Create indexes for user ID, status and anime identifiers.
+
+8. MUSIC SYSTEM — LAVALINK
+
+Implement a complete music player using Lavalink v4.
+
+The music system must be separate from the Discord command system.
+
+Use compatible, authorized audio-source integrations.
+
+Do not bypass provider restrictions.
+
+Spotify links may be used for metadata and track matching where supported, not as unrestricted direct Spotify audio streams.
+
+Commands:
+
+/play
+/pause
+/resume
+/skip
+/stop
+/queue
+/nowplaying
+/volume
+/loop
+/shuffle
+/remove
+/clear
+/search
+/lyrics
+/247
+
+Music functionality:
+
+Join voice channel.
+
+Leave voice channel.
+
+Search supported music sources.
+
+Play tracks.
+
+Queue tracks.
+
+Queue playlists where supported.
+
+Pause.
+
+Resume.
+
+Skip.
+
+Stop.
+
+Volume control.
+
+Loop current track.
+
+Loop queue.
+
+Shuffle.
+
+Remove tracks.
+
+Clear queue.
+
+Now Playing embed.
+
+Track duration.
+
+Track progress.
+
+Requester information.
+
+Track history.
+
+DJ permissions.
+
+Autoplay where supported.
+
+Multiple independent guild queues.
+
+Empty voice-channel cleanup.
+
+Voice connection recovery.
+
+Lavalink reconnect handling.
+
+Playback failure handling.
+
+Create an interactive Now Playing embed.
+
+Buttons:
+
+Previous.
+
+Pause/Resume.
+
+Skip.
+
+Stop.
+
+Loop.
+
+Shuffle.
+
+Add volume controls.
+
+Create music queue persistence only where it makes sense. Do not persist active voice sessions as if they can survive Discord or Lavalink disconnections.
+
+Handle Lavalink session resuming where supported.
+
+If Lavalink is offline, return a clear message instead of crashing the bot.
+
+9. MODERATION SYSTEM — DYNO REPLACEMENT
+
+Build a complete moderation system.
+
+Commands:
+
+/warn
+/warnings
+/warn remove
+/timeout
+/untimeout
+/kick
+/ban
+/unban
+/softban
+/purge
+/slowmode
+/lock
+/unlock
+/nickname
+/cases
+/modstats
+/appeal
+
+Moderation features:
+
+Warning system.
+
+Warning history.
+
+Timeout management.
+
+Kick.
+
+Ban.
+
+Temporary bans.
+
+Unban.
+
+Bulk message deletion.
+
+Slowmode.
+
+Channel locking.
+
+Nickname management.
+
+Moderation case numbers.
+
+Evidence attachments.
+
+Staff notes.
+
+Moderation audit logs.
+
+Appeal submissions.
+
+Automatic punishment expiration.
+
+Role-based permissions.
+
+Create configurable warning escalation.
+
+Default example:
+
+First violation: Warning.
+
+Second violation: 5-minute timeout.
+
+Third violation: 30-minute timeout.
+
+Fourth violation: 24-hour timeout.
+
+Severe violations: Staff review.
+
+Make escalation configurable per guild.
+
+10. AUTOMOD AND SERVER SECURITY
+
+Build automatic moderation.
+
+Features:
+
+Anti-spam.
+
+Duplicate-message detection.
+
+Excessive mentions.
+
+Suspicious invite filtering.
+
+Phishing link filtering.
+
+Configurable blocked words.
+
+Excessive caps detection.
+
+Flood detection.
+
+Raid detection.
+
+Suspicious account activity detection.
+
+Attachment restrictions.
+
+Link allowlists.
+
+Role and channel exclusions.
+
+Provide per-guild configuration.
+
+Allow administrators to:
+
+Enable/disable rules.
+
+Change thresholds.
+
+Configure punishment.
+
+Configure ignored channels.
+
+Configure ignored roles.
+
+View violations.
+
+Review false positives.
+
+Use a staged moderation system:
+
+Detect.
+
+Delete when appropriate.
+
+Warn.
+
+Timeout for repeated violations.
+
+Escalate serious incidents to moderators.
+
+Do not automatically ban members solely on unreliable heuristics.
+
+Respect Discord's API restrictions and community guidelines.
+
+11. COMMUNITY MANAGEMENT — CARL-BOT REPLACEMENT
+
+Implement:
+
+Welcome system:
+
+Custom welcome messages.
+
+Embed editor.
+
+Member mention.
+
+Member count.
+
+Welcome banners.
+
+Optional welcome DM.
+
+Farewell messages.
+
+Configurable welcome channels.
+
+Reaction roles:
+
+Create role panels.
+
+Button-based roles.
+
+Select-menu roles.
+
+Emoji-based roles.
+
+Toggle roles.
+
+Exclusive role groups.
+
+Maximum selection limits.
+
+Role validation.
+
+Suggestions:
+
+Submit suggestions.
+
+Upvote.
+
+Downvote.
+
+Staff approval.
+
+Staff rejection.
+
+Under consideration.
+
+Implemented.
+
+Suggestion history.
+
+Duplicate detection.
+
+Polls:
+
+Create polls.
+
+Multiple choices.
+
+Single choice.
+
+Duration.
+
+Automatic closing.
+
+Result display.
+
+Giveaways:
+
+Create giveaway.
+
+Duration.
+
+Number of winners.
+
+Eligibility requirements.
+
+Entry buttons.
+
+Automatic winner selection.
+
+Reroll.
+
+Audit logs.
+
+Tickets:
+
+General support.
+
+Bug reports.
+
+Feature requests.
+
+Partnership requests.
+
+Staff applications.
+
+Ticket features:
+
+Private ticket channels.
+
+Claim.
+
+Close.
+
+Reopen.
+
+Transcript.
+
+Staff assignment.
+
+Ticket categories.
+
+Logging.
+
+Additional commands:
+
+/afk.
+
+/remind.
+
+/serverinfo.
+
+/userinfo.
+
+/avatar.
+
+/roleinfo.
+
+/poll create.
+
+/suggest.
+
+/ticket create.
+
+/giveaway start.
+
+12. ANIME COMMUNITY ENTERTAINMENT
+
+Build unique anime-related community features.
+
+Anime quiz:
+
+Guess anime from descriptions.
+
+Character trivia.
+
+Genre trivia.
+
+Anime knowledge questions.
+
+Timed rounds.
+
+Scoreboard.
+
+Daily challenges.
+
+Difficulty settings.
+
+Do not reproduce copyrighted lyrics, long dialogue or unauthorized media clips.
+
+Anime roulette:
+
+Random anime.
+
+Genre-specific random selection.
+
+Filter by type.
+
+Filter by year.
+
+Anime of the day:
+
+Automatic daily recommendation.
+
+Configurable announcement channel.
+
+Avoid repeating recent recommendations.
+
+Character search:
+
+Search character metadata where a documented provider is available.
+
+Character image.
+
+Character description.
+
+Anime appearances.
+
+Do not invent character data if Hoshika does not expose it.
+
+Community profile:
+
+User profile.
+
+Favorite anime.
+
+Preferred genres.
+
+Watchlist statistics.
+
+Quiz scores.
+
+Community level.
+
+Leveling:
+
+XP from genuine participation.
+
+Message cooldown.
+
+Spam prevention.
+
+Configurable XP rates.
+
+Level-up notifications.
+
+Role rewards.
+
+Additional features:
+
+Anime brackets.
+
+Community voting.
+
+Anime bingo.
+
+Daily trivia.
+
+Quote of the day using original or appropriately licensed content.
+
+Community events.
+
+Birthday announcements.
+
+Personal reminders.
+
+Anime recommendation games.
+
+13. WEBSITE AUTOMATION
+
+The bot must be capable of receiving announcements from AniScroll's existing systems only when an existing supported integration is available.
+
+Do not modify the existing AniScroll backend to add new webhook endpoints.
+
+If an existing webhook or event feed is available:
+
+Consume it securely.
+
+Validate signatures where supported.
+
+Deduplicate events.
+
+Retry failures.
+
+Log notification history.
+
+If no existing integration exists, provide manual dashboard announcements.
+
+Create announcement categories:
+
+Website releases.
+
+Feature releases.
+
+Maintenance.
+
+Service status.
+
+Community announcements.
+
+Allow administrators to select destination Discord channels.
+
+Do not claim that automatic website events are working without a verified source.
+
+14. ADMINISTRATOR COMMANDS
+
+Create a full configuration command system.
+
+Commands:
+
+/config overview
+/config welcome
+/config automod
+/config moderation
+/config logging
+/config roles
+/config suggestions
+/config tickets
+/config music
+/config anime
+/config notifications
+/config permissions
+
+All configuration must be saved to PostgreSQL.
+
+Validate permissions on every configuration operation.
+
+Never allow ordinary users to modify server settings.
+
+15. WEB DASHBOARD
+
+Build a complete Next.js management website for AniScroll Bot.
+
+The dashboard is a separate application.
+
+It must not modify the existing AniScroll website.
+
+Design:
+
+Premium black and white.
+
+Minimal layout.
+
+Professional admin dashboard.
+
+Responsive mobile interface.
+
+Sidebar navigation.
+
+Clean cards.
+
+Data tables.
+
+Interactive charts.
+
+Modal forms.
+
+Toast notifications.
+
+Loading skeletons.
+
+Error states.
+
+Empty states.
+
+Website sections:
+
+A. Landing page
+
+AniScroll Bot branding.
+
+Product description.
+
+Feature showcase.
+
+Invite bot button.
+
+Dashboard login.
+
+Documentation.
+
+Support server link.
+
+B. Authentication
+
+Login with Discord.
+
+OAuth2 callback.
+
+Session handling.
+
+Logout.
+
+Permission verification.
+
+C. Server selection
+
+Display manageable servers.
+
+Server icon.
+
+Server name.
+
+Member count when available.
+
+Bot installation status.
+
+Select server.
+
+D. Dashboard overview
+
+Total members.
+
+Active members where available.
+
+Commands used.
+
+Moderation activity.
+
+Music activity.
+
+Bot uptime.
+
+Recent events.
+
+E. Moderation dashboard
+
+Warning records.
+
+Ban records.
+
+Timeout records.
+
+AutoMod settings.
+
+Case history.
+
+Staff activity.
+
+F. Community dashboard
+
+Welcome editor.
+
+Reaction role editor.
+
+Suggestion manager.
+
+Ticket manager.
+
+Giveaway manager.
+
+Poll manager.
+
+G. Music dashboard
+
+Music configuration.
+
+DJ roles.
+
+Volume defaults.
+
+Queue settings.
+
+Source availability.
+
+H. Anime dashboard
+
+Hoshika API connection status.
+
+Anime search test tool.
+
+Metadata cache settings.
+
+Search analytics.
+
+Watchlist statistics.
+
+Anime command configuration.
+
+Never display Hoshika secrets in the dashboard.
+
+I. Notifications dashboard
+
+Manual announcement editor.
+
+Destination channel selection.
+
+Announcement preview.
+
+Notification history.
+
+Delivery errors.
+
+J. Analytics
+
+Most used commands.
+
+Most searched anime.
+
+Popular anime genres.
+
+Music command usage.
+
+Moderation activity.
+
+Community participation.
+
+Time-based charts.
+
+Only display metrics backed by actual collected data.
+
+16. DATABASE ARCHITECTURE
+
+Use PostgreSQL with Prisma.
+
+Create appropriate models for:
+
+User:
+
+id.
+
+discordId.
+
+username.
+
+avatar.
+
+preferences.
+
+createdAt.
+
+updatedAt.
+
+Guild:
+
+id.
+
+discordGuildId.
+
+name.
+
+icon.
+
+settings.
+
+createdAt.
+
+updatedAt.
+
+GuildSettings:
+
+guildId.
+
+welcomeConfig.
+
+moderationConfig.
+
+automodConfig.
+
+musicConfig.
+
+loggingConfig.
+
+notificationConfig.
+
+Watchlist:
+
+id.
+
+discordUserId.
+
+hoshikaId.
+
+anilistId.
+
+malId.
+
+titleSnapshot.
+
+posterSnapshot.
+
+status.
+
+episodesWatched.
+
+personalRating.
+
+notes.
+
+createdAt.
+
+updatedAt.
+
+ModerationCase:
+
+id.
+
+guildId.
+
+targetUserId.
+
+moderatorId.
+
+action.
+
+reason.
+
+evidence.
+
+expiresAt.
+
+createdAt.
+
+Warning:
+
+id.
+
+guildId.
+
+userId.
+
+moderatorId.
+
+reason.
+
+createdAt.
+
+Ticket:
+
+id.
+
+guildId.
+
+channelId.
+
+userId.
+
+category.
+
+assignedStaffId.
+
+status.
+
+transcriptUrl.
+
+createdAt.
+
+closedAt.
+
+Suggestion:
+
+id.
+
+guildId.
+
+userId.
+
+content.
+
+status.
+
+votes.
+
+staffResponse.
+
+createdAt.
+
+updatedAt.
+
+MusicPlaylist:
+
+id.
+
+userId.
+
+name.
+
+tracks.
+
+createdAt.
+
+UserProfile:
+
+discordUserId.
+
+favoriteAnime.
+
+preferredGenres.
+
+experiencePoints.
+
+level.
+
+quizStatistics.
+
+Notification:
+
+id.
+
+guildId.
+
+type.
+
+destinationChannelId.
+
+payload.
+
+deliveryStatus.
+
+createdAt.
+
+AuditLog:
+
+id.
+
+guildId.
+
+actorId.
+
+action.
+
+targetId.
+
+details.
+
+createdAt.
+
+Add proper:
+
+Unique constraints.
+
+Foreign keys.
+
+Indexes.
+
+Cascading rules.
+
+Database migrations.
+
+Data validation.
+
+Avoid storing unnecessary Discord personal information.
+
+17. API AND SECURITY
+
+The dashboard needs its own backend API.
+
+These routes belong exclusively to the new AniScroll Bot project.
+
+Never add routes to the existing AniScroll website.
+
+Use:
+
+Secure session cookies.
+
+CSRF protection where appropriate.
+
+OAuth2 state verification.
+
+Server-side permission checks.
+
+Input validation.
+
+Rate limiting.
+
+Request logging.
+
+Structured errors.
+
+API versioning.
+
+Create a separate internal API namespace for the bot dashboard.
+
+Protect all administrator operations.
+
+Use environment variables for:
+
+DISCORD_TOKEN.
+
+DISCORD_CLIENT_ID.
+
+DISCORD_CLIENT_SECRET.
+
+DATABASE_URL.
+
+REDIS_URL.
+
+HOSHIKA_BASE_URL.
+
+HOSHIKA_API_KEY, only if required by actual documentation.
+
+ANISCROLL_API_BASE_URL.
+
+LAVALINK_HOST.
+
+LAVALINK_PORT.
+
+LAVALINK_PASSWORD.
+
+SESSION_SECRET.
+
+DASHBOARD_URL.
+
+Do not hardcode credentials.
+
+Do not commit .env files.
+
+Provide .env.example with placeholder values only.
+
+18. CACHING AND PERFORMANCE
+
+Implement Redis caching.
+
+Suggested initial cache policies:
+
+Anime search: 5 minutes.
+
+Anime details: 30 minutes.
+
+Anime episode lists: 15 minutes.
+
+Trending anime: 10 minutes.
+
+Seasonal anime: 1 hour.
+
+Genre lists: 24 hours.
+
+Make TTLs configurable.
+
+Implement:
+
+Cache keys.
+
+Cache invalidation.
+
+Cache versioning.
+
+Request deduplication.
+
+Per-user command cooldowns.
+
+Per-guild limits.
+
+API timeout handling.
+
+Retry with exponential backoff.
+
+Rate-limit awareness.
+
+Do not retry permanent errors indefinitely.
+
+19. MONITORING AND RELIABILITY
+
+Build:
+
+Health checks.
+
+Structured logs.
+
+Error reporting.
+
+Database connection monitoring.
+
+Redis connection monitoring.
+
+Lavalink connection monitoring.
+
+Hoshika API status monitoring.
+
+Discord gateway status.
+
+Graceful shutdown.
+
+Process restart support.
+
+Scheduled cleanup jobs.
+
+Background job retries.
+
+A temporary external API failure must not crash the whole bot.
+
+When Hoshika is unavailable:
+
+Return a clear temporary error.
+
+Use valid cached data where appropriate.
+
+Avoid returning fabricated metadata.
+
+When Lavalink is unavailable:
+
+Disable music commands gracefully.
+
+Keep moderation, anime search and other bot features operational.
+
+20. DEPLOYMENT
+
+Create a Docker-compatible project.
+
+Provide:
+
+Dockerfile for bot.
+
+Dockerfile for dashboard.
+
+Docker Compose configuration.
+
+PostgreSQL service.
+
+Redis service.
+
+Lavalink service.
+
+Health checks.
+
+Persistent volumes.
+
+Environment variables.
+
+Database migration command.
+
+Production startup command.
+
+Development startup command.
+
+The bot must run as a persistent Node.js service.
+
+Do not deploy the Discord Gateway bot as a short-lived serverless function.
+
+The dashboard can be deployed separately.
+
+Provide instructions for:
+
+Local development.
+
+Discord application creation.
+
+Bot invitation.
+
+OAuth2 setup.
+
+Lavalink setup.
+
+Hoshika configuration.
+
+Database initialization.
+
+Production deployment.
+
+Backups.
+
+Monitoring.
+
+Do not assume free hosting can guarantee 24/7 uptime.
+
+21. ERROR HANDLING
+
+Implement consistent errors.
+
+Examples:
+
+Anime not found.
+
+Hoshika temporarily unavailable.
+
+API rate limit exceeded.
+
+Music source unavailable.
+
+User not in voice channel.
+
+Bot missing permissions.
+
+User missing permissions.
+
+Lavalink disconnected.
+
+Database unavailable.
+
+Invalid anime identifier.
+
+Duplicate watchlist entry.
+
+Ticket already closed.
+
+Interaction expired.
+
+Provide understandable messages to users.
+
+Never expose stack traces, credentials or internal server information in Discord messages.
+
+22. TESTING
+
+Write actual automated tests.
+
+Test:
+
+Discord command registration.
+
+Command permission validation.
+
+Anime search.
+
+Hoshika response normalization.
+
+Anime pagination.
+
+Watchlist insertion.
+
+Duplicate prevention.
+
+Watchlist updates.
+
+Episode progress validation.
+
+Moderation actions.
+
+Warning escalation.
+
+AutoMod filters.
+
+Role assignment.
+
+Ticket lifecycle.
+
+Suggestion voting.
+
+Music queue logic.
+
+Lavalink failure recovery.
+
+OAuth2 login.
+
+Dashboard authorization.
+
+Database migrations.
+
+Cache expiration.
+
+Webhook signature verification where applicable.
+
+Use mocked external API responses for automated tests, but also provide integration test procedures against real services.
+
+23. PROJECT STRUCTURE
+
+Create a clean monorepo.
+
+aniscroll-bot/
+apps/
+bot/
+src/
+commands/
+anime/
+watchlist/
+music/
+moderation/
+automod/
+community/
+utility/
+admin/
+events/
+interactions/
+services/
+hoshika/
+anime/
+music/
+moderation/
+cache/
+database/
+jobs/
+config/
+utils/
+index.ts
+
+dashboard/
+  app/
+    login/
+    dashboard/
+    servers/
+    moderation/
+    community/
+    music/
+    anime/
+    notifications/
+    analytics/
+    settings/
+  components/
+  hooks/
+  lib/
+  styles/
+
+api/
+  src/
+    routes/
+    middleware/
+    services/
+    auth/
+    config/
+    index.ts
+
+packages/
+shared/
+database/
+validation/
+discord-ui/
+
+prisma/
+schema.prisma
+migrations/
+
+infrastructure/
+docker/
+lavalink/
+
+tests/
+
+docs/
+
+docker-compose.yml
+package.json
+pnpm-workspace.yaml
+.env.example
+README.md
+
+You may improve this structure if there is a technically better approach, but maintain clear boundaries between bot, dashboard, API and shared packages.
+
+24. IMPLEMENTATION RULES
+
+This is extremely important.
+
+Do not attempt to generate the entire application as one enormous untested file.
+
+Build in phases.
+
+PHASE 1:
+
+Repository structure.
+
+TypeScript configuration.
+
+Discord bot connection.
+
+PostgreSQL.
+
+Prisma.
+
+Redis.
+
+Configuration.
+
+Logging.
+
+Health checks.
+
+PHASE 2:
+
+Hoshika integration.
+
+Anime search.
+
+Anime details.
+
+Anime embeds.
+
+Anime pagination.
+
+Anime discovery commands.
+
+PHASE 3:
+
+Watchlist.
+
+Watch status.
+
+Episode progress.
+
+Personal statistics.
+
+Watchlist export.
+
+PHASE 4:
+
+Moderation.
+
+AutoMod.
+
+Warning system.
+
+Logging.
+
+Permission system.
+
+PHASE 5:
+
+Welcome.
+
+Reaction roles.
+
+Suggestions.
+
+Polls.
+
+Giveaways.
+
+Tickets.
+
+PHASE 6:
+
+Lavalink.
+
+Music commands.
+
+Queues.
+
+Interactive player.
+
+Recovery handling.
+
+PHASE 7:
+
+Anime games.
+
+User profiles.
+
+Leveling.
+
+Leaderboards.
+
+Community events.
+
+PHASE 8:
+
+Dashboard.
+
+Discord OAuth2.
+
+Server selection.
+
+Configuration pages.
+
+Analytics.
+
+Notification management.
+
+PHASE 9:
+
+Testing.
+
+Security review.
+
+Performance optimization.
+
+Docker.
+
+Deployment.
+
+Documentation.
+
+For every phase:
+
+Explain the implementation.
+
+Create the actual files.
+
+Implement the feature.
+
+Validate types.
+
+Run linting.
+
+Run relevant tests.
+
+Fix errors.
+
+Document configuration.
+
+Continue to the next phase.
+
+Do not mark a feature complete merely because its interface exists.
+
+Use real persistence.
+
+Do not leave TODO placeholders for essential functionality.
+
+If a feature depends on unavailable credentials, implement its integration fully and clearly document the remaining configuration step.
+
+Never fabricate successful API responses.
+
+25. FINAL ACCEPTANCE CRITERIA
+
+The project is complete only when:
+
+Discord bot successfully connects.
+
+Slash commands register.
+
+Anime search retrieves real Hoshika metadata.
+
+Anime details work.
+
+Anime pagination works.
+
+Watchlists persist across restarts.
+
+Watchlist status and progress work.
+
+Moderation actions work.
+
+AutoMod works.
+
+Welcome messages work.
+
+Reaction roles work.
+
+Suggestions work.
+
+Tickets work.
+
+Music plays through Lavalink and authorized sources.
+
+Music queues work independently per guild.
+
+Dashboard authentication works.
+
+Server selection works.
+
+Dashboard settings persist.
+
+Analytics use real collected data.
+
+Database migrations work.
+
+Docker deployment works.
+
+Errors are handled safely.
+
+No existing AniScroll backend files have been modified.
+
+No new AniScroll website endpoints have been created.
+
+No AniSkip integration exists.
+
+No Hoshika official streaming availability is displayed.
+
+26. FINAL PRODUCT VISION
+
+AniScroll Bot must become a central companion to the AniScroll ecosystem.
+
+It should provide:
+
+Powerful anime discovery.
+
+Personal anime watchlists.
+
+Full Discord moderation.
+
+Community management.
+
+Music playback.
+
+Anime entertainment.
+
+Server administration.
+
+Professional web dashboard.
+
+Reliable infrastructure.
+
+The bot should feel like a polished commercial Discord application, not a collection of unrelated commands.
+
+Prioritize correctness, security, maintainability, performance and excellent user experience.
+
+Start by inspecting the available project environment and supplied Hoshika documentation.
+
+If no repository exists, create the monorepo from scratch.
+
+If required API documentation or credentials are missing, clearly identify what is needed rather than inventing it.
+
+Begin with Phase 1 and implement the actual working foundation before proceeding.

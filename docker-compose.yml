@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: aniscroll
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aniscroll_password}
+      POSTGRES_DB: aniscroll_bot
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aniscroll -d aniscroll_bot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  aniscroll-bot:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/dashboard.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://aniscroll:${POSTGRES_PASSWORD:-aniscroll_password}@postgres:5432/aniscroll_bot?schema=public
+      REDIS_URL: redis://redis:6379
+      LAVALINK_HOST: ${LAVALINK_HOST:-lavalink.cloudewave.in}
+      LAVALINK_PORT: ${LAVALINK_PORT:-2336}
+      LAVALINK_PASSWORD: ${LAVALINK_PASSWORD:-cloudewave.in}
+      LAVALINK_SECURE: ${LAVALINK_SECURE:-false}
+    ports:
+      - "3000:3000"
+    volumes:
+      - bot_sqlite_data:/app/data
+
+volumes:
+  postgres_data:
+  redis_data:
+  bot_sqlite_data:

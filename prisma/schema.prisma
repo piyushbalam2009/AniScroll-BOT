@@ -1,0 +1,444 @@
+// AniScroll Bot — Production PostgreSQL Schema (Prisma ORM)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WatchStatus {
+  PLAN_TO_WATCH
+  WATCHING
+  COMPLETED
+  ON_HOLD
+  DROPPED
+}
+
+enum ModerationAction {
+  WARN
+  TIMEOUT
+  UNTIMEOUT
+  KICK
+  BAN
+  TEMP_BAN
+  UNBAN
+  SOFTBAN
+  AUTOMOD_DELETE
+  AUTOMOD_TIMEOUT
+}
+
+enum SuggestionStatus {
+  PENDING
+  UNDER_CONSIDERATION
+  APPROVED
+  REJECTED
+  IMPLEMENTED
+}
+
+enum TicketCategory {
+  GENERAL_SUPPORT
+  BUG_REPORT
+  FEATURE_REQUEST
+  PARTNERSHIP
+  STAFF_APPLICATION
+}
+
+enum TicketStatus {
+  OPEN
+  CLAIMED
+  CLOSED
+}
+
+enum NotificationType {
+  WEBSITE_RELEASE
+  FEATURE_RELEASE
+  MAINTENANCE
+  SERVICE_STATUS
+  COMMUNITY_ANNOUNCEMENT
+}
+
+model User {
+  id          String   @id @default(cuid())
+  discordId   String   @unique
+  username    String
+  avatar      String?
+  preferences Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  watchlist      Watchlist[]
+  musicPlaylists MusicPlaylist[]
+  profile        UserProfile?
+
+  @@index([discordId])
+}
+
+model Guild {
+  id             String   @id @default(cuid())
+  discordGuildId String   @unique
+  name           String
+  icon           String?
+  memberCount    Int      @default(0)
+  botInstalled   Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  settings           GuildSettings?
+  welcomeSettings    GuildWelcomeSettings?
+  moderationCases    ModerationCase[]
+  warnings           Warning[]
+  tickets            Ticket[]
+  suggestions        Suggestion[]
+  polls              Poll[]
+  giveaways          Giveaway[]
+  reactionRolePanels ReactionRolePanel[]
+  notifications            Notification[]
+  auditLogs                AuditLog[]
+  commandMetrics           CommandMetric[]
+  communityRecommendations CommunityRecommendation[]
+
+  @@index([discordGuildId])
+}
+
+model CommunityRecommendation {
+  id             String   @id @default(cuid())
+  guildId        String
+  channelId      String
+  discordUserId  String
+  username       String   @default("Member")
+  hoshikaShortId Int
+  animeTitle     String
+  messageId      String?
+  createdAt      DateTime @default(now())
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, createdAt])
+  @@index([guildId, hoshikaShortId])
+  @@index([guildId, discordUserId])
+}
+
+model GuildWelcomeSettings {
+  id               String    @id @default(cuid())
+  guildId          String    @unique
+  enabled          Boolean   @default(false)
+  channelId        String?
+  messageTemplate  String    @default("Welcome {user} to {server}. You are member #{memberCount}.")
+  embedEnabled     Boolean   @default(true)
+  embedTitle       String    @default("Welcome to {server}")
+  embedDescription String    @default("Glad to have you here, {user}.")
+  embedColor       String    @default("#FFFFFF")
+  embedThumbnail   String?
+  embedImage       String?
+  embedFooter      String?
+  showMemberAvatar Boolean   @default(true)
+  successCount     Int       @default(0)
+  lastWelcomeAt    DateTime?
+  lastError        String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+model GuildSettings {
+  id                 String   @id @default(cuid())
+  guildId            String   @unique
+  welcomeConfig      Json     @default("{}")
+  moderationConfig   Json     @default("{}")
+  automodConfig      Json     @default("{}")
+  musicConfig        Json     @default("{}")
+  animeConfig        Json     @default("{}")
+  loggingConfig      Json     @default("{}")
+  notificationConfig Json     @default("{}")
+  communityConfig    Json     @default("{}")
+  updatedAt          DateTime @updatedAt
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+model Watchlist {
+  id              String      @id @default(cuid())
+  discordUserId   String
+  hoshikaId       String
+  hoshikaShortId  Int?
+  anilistId       Int?
+  malId           Int?
+  titleSnapshot   String
+  posterSnapshot  String?
+  genresSnapshot  Json        @default("[]")
+  totalEpisodes   Int?
+  status          WatchStatus @default(PLAN_TO_WATCH)
+  episodesWatched Int         @default(0)
+  personalRating  Int?
+  notes           String?
+  isPublic        Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  user User @relation(fields: [discordUserId], references: [discordId], onDelete: Cascade)
+
+  @@unique([discordUserId, hoshikaId])
+  @@index([discordUserId])
+  @@index([discordUserId, status])
+  @@index([hoshikaId])
+  @@index([anilistId])
+  @@index([malId])
+}
+
+model ModerationCase {
+  id           String           @id @default(cuid())
+  caseNumber   Int
+  guildId      String
+  targetUserId String
+  moderatorId  String
+  action       ModerationAction
+  reason       String
+  evidence     String?
+  staffNotes   String?
+  appealStatus String?
+  appealText   String?
+  active       Boolean          @default(true)
+  expiresAt    DateTime?
+  createdAt    DateTime         @default(now())
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, caseNumber])
+  @@index([guildId, targetUserId])
+  @@index([guildId, createdAt])
+  @@index([expiresAt, active])
+}
+
+model Warning {
+  id          String   @id @default(cuid())
+  guildId     String
+  userId      String
+  moderatorId String
+  reason      String
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, userId])
+  @@index([guildId, createdAt])
+}
+
+model Ticket {
+  id              String         @id @default(cuid())
+  guildId         String
+  channelId       String         @unique
+  userId          String
+  category        TicketCategory @default(GENERAL_SUPPORT)
+  subject         String?
+  assignedStaffId String?
+  status          TicketStatus   @default(OPEN)
+  transcriptUrl   String?
+  transcriptText  String?
+  createdAt       DateTime       @default(now())
+  closedAt        DateTime?
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, status])
+  @@index([guildId, userId])
+}
+
+model Suggestion {
+  id            String           @id @default(cuid())
+  guildId       String
+  userId        String
+  messageId     String?
+  content       String
+  contentHash   String
+  status        SuggestionStatus @default(PENDING)
+  upvotes       Int              @default(0)
+  downvotes     Int              @default(0)
+  voterIds      Json             @default("{}")
+  staffResponse String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, contentHash])
+  @@index([guildId, status])
+}
+
+model Poll {
+  id            String   @id @default(cuid())
+  guildId       String
+  channelId     String
+  messageId     String?
+  creatorId     String
+  question      String
+  options       Json     @default("[]")
+  votes         Json     @default("{}")
+  allowMultiple Boolean  @default(false)
+  closed        Boolean  @default(false)
+  endsAt        DateTime
+  createdAt     DateTime @default(now())
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, closed])
+  @@index([endsAt, closed])
+}
+
+model Giveaway {
+  id              String   @id @default(cuid())
+  guildId         String
+  channelId       String
+  messageId       String?
+  hostId          String
+  prize           String
+  winnerCount     Int      @default(1)
+  requiredRoleId  String?
+  minLevel        Int?
+  entrants        Json     @default("[]")
+  winnerIds       Json     @default("[]")
+  ended           Boolean  @default(false)
+  endsAt          DateTime
+  createdAt       DateTime @default(now())
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, ended])
+  @@index([endsAt, ended])
+}
+
+model ReactionRolePanel {
+  id            String   @id @default(cuid())
+  guildId       String
+  channelId     String
+  messageId     String?
+  title         String
+  description   String?
+  mode          String   @default("BUTTON") // BUTTON | SELECT | EMOJI
+  exclusive     Boolean  @default(false)
+  maxSelections Int      @default(1)
+  roles         Json     @default("[]")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId])
+}
+
+model MusicPlaylist {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  tracks    Json     @default("[]")
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [discordId], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model UserProfile {
+  id               String   @id @default(cuid())
+  discordUserId    String   @unique
+  favoriteAnime    Json     @default("[]")
+  preferredGenres  Json     @default("[]")
+  experiencePoints Int      @default(0)
+  level            Int      @default(1)
+  quizStatistics   Json     @default("{\"played\":0,\"won\":0,\"score\":0}")
+  birthday         String?
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [discordUserId], references: [discordId], onDelete: Cascade)
+
+  @@index([level, experiencePoints])
+}
+
+model Notification {
+  id                   String           @id @default(cuid())
+  guildId              String
+  type                 NotificationType
+  destinationChannelId String
+  title                String
+  payload              Json
+  deliveryStatus       String           @default("PENDING") // PENDING | DELIVERED | FAILED
+  errorMessage         String?
+  dedupeKey            String?          @unique
+  createdAt            DateTime         @default(now())
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  guildId   String
+  actorId   String
+  action    String
+  targetId  String?
+  details   Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, createdAt])
+}
+
+model CommandMetric {
+  id          String   @id @default(cuid())
+  guildId     String?
+  commandName String
+  category    String
+  userId      String
+  success     Boolean  @default(true)
+  durationMs  Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  guild Guild? @relation(fields: [guildId], references: [id], onDelete: SetNull)
+
+  @@index([commandName, createdAt])
+  @@index([guildId, createdAt])
+}
+
+model AnimeSearchMetric {
+  id          String   @id @default(cuid())
+  query       String
+  hoshikaId   String?
+  title       String?
+  genres      Json     @default("[]")
+  userId      String
+  guildId     String?
+  createdAt   DateTime @default(now())
+
+  @@index([query])
+  @@index([createdAt])
+}
+
+model Reminder {
+  id        String   @id @default(cuid())
+  userId    String
+  guildId   String?
+  channelId String
+  message   String
+  remindAt  DateTime
+  sent      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([remindAt, sent])
+}
+
+model AfkStatus {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  reason    String
+  since     DateTime @default(now())
+
+  @@unique([guildId, userId])
+}
