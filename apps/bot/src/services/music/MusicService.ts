@@ -385,6 +385,15 @@ export class MusicService {
       null
     );
 
+    log.info(
+      {
+        host: this.config.LAVALINK_HOST,
+        port: this.config.LAVALINK_PORT,
+        secure: this.config.LAVALINK_SECURE,
+      },
+      `Lavalink target: ${this.config.LAVALINK_HOST}:${this.config.LAVALINK_PORT} | SSL: ${this.config.LAVALINK_SECURE ? 'enabled' : 'disabled'}`
+    );
+
     const nodes: NodeOption[] = [
       {
         name: 'primary-lavalink-v4',

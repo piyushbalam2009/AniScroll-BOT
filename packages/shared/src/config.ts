@@ -38,10 +38,10 @@ const envSchema = z.object({
 
   LAVALINK_HOST: z.string().optional().default('lavalink.cloudewave.in'),
   LAVALINK_PORT: z.preprocess(
-    (v) => (v === '' || v === undefined ? 2336 : v),
+    (v) => (v === '' || v === undefined ? 2347 : v),
     z.coerce.number().int().positive()
   ),
-  LAVALINK_PASSWORD: z.string().optional().default('cloudewave.in'),
+  LAVALINK_PASSWORD: z.string().optional().default(''),
   LAVALINK_SECURE: z
     .string()
     .optional()
@@ -90,22 +90,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const rawHost = (parsed.LAVALINK_HOST || '').trim();
-  const isStaleLocalHost =
-    parsed.NODE_ENV !== 'test' &&
-    (!rawHost || /^(localhost|127\.0\.0\.1|0\.0\.0\.0|lavalink)$/i.test(rawHost));
-  const lavalinkHost = isStaleLocalHost ? 'lavalink.cloudewave.in' : rawHost || 'lavalink.cloudewave.in';
-
-  const isCloudeWaveNode = lavalinkHost.toLowerCase() === 'lavalink.cloudewave.in';
-  const rawPort = Number(parsed.LAVALINK_PORT || 2336);
-  const lavalinkPort = isCloudeWaveNode ? 2336 : rawPort;
-
-  const rawPassword = (parsed.LAVALINK_PASSWORD || '').trim();
-  const lavalinkPassword =
-    isCloudeWaveNode || !rawPassword || rawPassword === 'youshallnotpass'
-      ? 'cloudewave.in'
-      : rawPassword;
-  const lavalinkSecure = isCloudeWaveNode ? false : Boolean(parsed.LAVALINK_SECURE ?? false);
+  const lavalinkHost = (parsed.LAVALINK_HOST || 'lavalink.cloudewave.in').trim();
+  const lavalinkPort = Number(parsed.LAVALINK_PORT || 2347);
+  const lavalinkPassword = (parsed.LAVALINK_PASSWORD || '').trim();
+  const lavalinkSecure = Boolean(parsed.LAVALINK_SECURE ?? false);
   const websiteApiUrl = (parsed.ANISCROLL_WEBSITE_API_URL || 'https://aniscroll.in').trim().replace(/\/+$/, '');
 
   return {
@@ -120,7 +108,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     isDiscordConfigured: Boolean(parsed.DISCORD_TOKEN && parsed.DISCORD_TOKEN.length > 20),
     isOAuthConfigured: Boolean(parsed.DISCORD_CLIENT_ID && parsed.DISCORD_CLIENT_SECRET),
     isRedisConfigured: Boolean(parsed.REDIS_URL && parsed.REDIS_URL.startsWith('redis')),
-    isLavalinkConfigured: Boolean(lavalinkHost && lavalinkPassword),
+    isLavalinkConfigured: Boolean(lavalinkHost && lavalinkPort),
     isSpotifyConfigured: Boolean(parsed.SPOTIFY_CLIENT_ID.trim() && parsed.SPOTIFY_CLIENT_SECRET.trim()),
     isYouTubeOAuthConfigured: Boolean(parsed.YOUTUBE_OAUTH_REFRESH_TOKEN.trim()),
     isWebsiteWatchlistConfigured: Boolean(websiteApiUrl && parsed.ANISCROLL_BOT_API_SECRET.trim()),

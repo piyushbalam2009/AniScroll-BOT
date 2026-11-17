@@ -6,6 +6,7 @@ import {
   appConfig,
   buildAniScrollAnimeUrl,
   DEFAULT_GUILD_SETTINGS,
+  loadConfig,
   normalizeHoshikaShortId,
 } from '../packages/shared/src';
 import { buildCommandRegistry } from '../apps/bot/src/commands';
@@ -1770,6 +1771,38 @@ test('Public /anime recommendation command: Frieren, Naruto, One Piece exact mat
   const stats = db.getCommunityRecommendationStats('guild-rec-1', 'https://aniscroll.in');
   assert.equal(stats.totalRecommendations, 5);
   assert.equal(stats.topRecommendedAnime[0]?.aniscrollUrl?.startsWith('https://aniscroll.in/anime/'), true);
+});
+
+test('loadConfig respects exact Lavalink environment variables without overriding host, port, password, or secure', () => {
+  const cfg1 = loadConfig({
+    LAVALINK_HOST: 'lavalink.cloudewave.in',
+    LAVALINK_PORT: '2347',
+    LAVALINK_PASSWORD: 'my-custom-secret-password',
+    LAVALINK_SECURE: 'false',
+  });
+  assert.equal(cfg1.LAVALINK_HOST, 'lavalink.cloudewave.in');
+  assert.equal(cfg1.LAVALINK_PORT, 2347);
+  assert.equal(cfg1.LAVALINK_PASSWORD, 'my-custom-secret-password');
+  assert.equal(cfg1.LAVALINK_SECURE, false);
+
+  const cfg2 = loadConfig({
+    LAVALINK_HOST: 'lavalink.cloudewave.in',
+    LAVALINK_PORT: '2336',
+    LAVALINK_PASSWORD: 'another-password',
+    LAVALINK_SECURE: 'false',
+  });
+  assert.equal(cfg2.LAVALINK_PORT, 2336);
+
+  const cfg3 = loadConfig({
+    LAVALINK_HOST: 'audio.custom-node.net',
+    LAVALINK_PORT: '5555',
+    LAVALINK_PASSWORD: 'custom-pass',
+    LAVALINK_SECURE: 'true',
+  });
+  assert.equal(cfg3.LAVALINK_HOST, 'audio.custom-node.net');
+  assert.equal(cfg3.LAVALINK_PORT, 5555);
+  assert.equal(cfg3.LAVALINK_PASSWORD, 'custom-pass');
+  assert.equal(cfg3.LAVALINK_SECURE, true);
 });
 
 
