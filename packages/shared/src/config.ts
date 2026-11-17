@@ -53,6 +53,24 @@ const envSchema = z.object({
   YOUTUBE_OAUTH_REFRESH_TOKEN: z.string().optional().default(''),
 
   SESSION_SECRET: z.string().optional().default('aniscroll-dev-session-secret-change-in-production-32chars'),
+
+  ANISCROLL_STATUS_MONITOR_ENABLED: z
+    .string()
+    .optional()
+    .transform((v) => v !== 'false')
+    .default(true),
+  ANISCROLL_STATUS_CHECK_INTERVAL: z.coerce.number().int().positive().default(60),
+  ANISCROLL_STATUS_TIMEOUT: z.coerce.number().int().positive().default(10000),
+  ANISCROLL_STATUS_FAILURE_THRESHOLD: z.coerce.number().int().positive().default(3),
+  ANISCROLL_STATUS_RECOVERY_THRESHOLD: z.coerce.number().int().positive().default(2),
+
+  ANISCROLL_WEBSITE_URL: z.string().default('https://aniscroll.in'),
+  ANISCROLL_STREAMING_API_URL: z.string().default('https://anivault-scraper-five.vercel.app'),
+  ANISCROLL_HOSHIKA_API_URL: z.string().default('https://hoshika.app/api/v1'),
+
+  ANISCROLL_STATUS_CHANNEL_ID: z.string().optional().default(''),
+  ANISCROLL_UPDATES_CHANNEL_ID: z.string().optional().default(''),
+  ANISCROLL_STATUS_TIMEZONE: z.string().default('Asia/Kolkata'),
 });
 
 export type AppConfig = z.infer<typeof envSchema> & {

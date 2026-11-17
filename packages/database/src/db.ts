@@ -199,6 +199,63 @@ export interface CommunityRecommendationRecord {
   createdAt: string;
 }
 
+export interface ServiceStatusRecord {
+  serviceKey: string;
+  name: string;
+  status: 'ONLINE' | 'DEGRADED' | 'OFFLINE' | 'MAINTENANCE';
+  responseTimeMs: number;
+  lastCheckedAt: string;
+  consecutiveFailures: number;
+  consecutiveSuccesses: number;
+  details: Record<string, unknown>;
+  errorMessage: string | null;
+}
+
+export interface ServiceIncidentRecord {
+  id: string;
+  serviceKey: string;
+  title: string;
+  description: string;
+  status: 'INVESTIGATING' | 'IDENTIFIED' | 'MONITORING' | 'RESOLVED';
+  severity: 'MINOR' | 'MAJOR' | 'CRITICAL';
+  startedAt: string;
+  resolvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WebsiteAnnouncementRecord {
+  id: string;
+  title: string;
+  content: string;
+  authorId: string;
+  version: string | null;
+  category: 'UPDATE' | 'PATCH' | 'ANNOUNCEMENT' | 'MAINTENANCE';
+  discordMessageId: string | null;
+  channelId: string | null;
+  createdAt: string;
+}
+
+export interface ScheduledMaintenanceRecord {
+  id: string;
+  title: string;
+  description: string;
+  services: string[];
+  status: 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  scheduledStartAt: string;
+  scheduledEndAt: string;
+  createdAt: string;
+}
+
+export interface StatusConfigRecord {
+  guildId: string;
+  statusChannelId: string | null;
+  updatesChannelId: string | null;
+  pingRoleId: string | null;
+  timezone: string;
+  updatedAt: string;
+}
+
 export class AniScrollDatabase {
   public readonly sqlite: Database.Database;
 
@@ -486,6 +543,65 @@ export class AniScrollDatabase {
       CREATE INDEX IF NOT EXISTS idx_comm_rec_guild_created ON community_recommendations(guild_id, created_at);
       CREATE INDEX IF NOT EXISTS idx_comm_rec_guild_anime ON community_recommendations(guild_id, hoshika_short_id);
       CREATE INDEX IF NOT EXISTS idx_comm_rec_guild_user ON community_recommendations(guild_id, discord_user_id);
+
+      CREATE TABLE IF NOT EXISTS service_status (
+        service_key TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'ONLINE',
+        response_time_ms INTEGER NOT NULL DEFAULT 0,
+        last_checked_at TEXT NOT NULL,
+        consecutive_failures INTEGER NOT NULL DEFAULT 0,
+        consecutive_successes INTEGER NOT NULL DEFAULT 0,
+        details_json TEXT NOT NULL DEFAULT '{}',
+        error_message TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS service_incidents (
+        id TEXT PRIMARY KEY,
+        service_key TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'INVESTIGATING',
+        severity TEXT NOT NULL DEFAULT 'MAJOR',
+        started_at TEXT NOT NULL,
+        resolved_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_service_incidents_key ON service_incidents(service_key, status);
+
+      CREATE TABLE IF NOT EXISTS website_announcements (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        author_id TEXT NOT NULL,
+        version TEXT,
+        category TEXT NOT NULL DEFAULT 'UPDATE',
+        discord_message_id TEXT,
+        channel_id TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_website_announcements_created ON website_announcements(created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS scheduled_maintenance (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        services_json TEXT NOT NULL DEFAULT '[]',
+        status TEXT NOT NULL DEFAULT 'SCHEDULED',
+        scheduled_start_at TEXT NOT NULL,
+        scheduled_end_at TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS status_configs (
+        guild_id TEXT PRIMARY KEY,
+        status_channel_id TEXT,
+        updates_channel_id TEXT,
+        ping_role_id TEXT,
+        timezone TEXT NOT NULL DEFAULT 'Asia/Kolkata',
+        updated_at TEXT NOT NULL
+      );
     `);
   }
 
@@ -1988,5 +2104,308 @@ export class AniScrollDatabase {
       })),
       recentRecommendations: recent,
     };
+  }
+
+  // ==================== STATUS MONITORING & ANNOUNCEMENTS ====================
+
+  public getServiceStatuses(): ServiceStatusRecord[] {
+    const rows = this.sqlite.prepare('SELECT * FROM service_status ORDER BY service_key ASC').all() as any[];
+    return rows.map((r) => ({
+      serviceKey: r.service_key,
+      name: r.name,
+      status: r.status,
+      responseTimeMs: r.response_time_ms,
+      lastCheckedAt: r.last_checked_at,
+      consecutiveFailures: r.consecutive_failures,
+      consecutiveSuccesses: r.consecutive_successes,
+      details: JSON.parse(r.details_json || '{}'),
+      errorMessage: r.error_message,
+    }));
+  }
+
+  public updateServiceStatus(
+    serviceKey: string,
+    name: string,
+    status: 'ONLINE' | 'DEGRADED' | 'OFFLINE' | 'MAINTENANCE',
+    responseTimeMs: number,
+    details: Record<string, unknown> = {},
+    errorMessage?: string | null
+  ) {
+    const now = this.now();
+    const existing = this.sqlite.prepare('SELECT * FROM service_status WHERE service_key = ?').get(serviceKey) as any;
+    if (!existing) {
+      this.sqlite
+        .prepare(
+          `INSERT INTO service_status (service_key, name, status, response_time_ms, last_checked_at, consecutive_failures, consecutive_successes, details_json, error_message)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(
+          serviceKey,
+          name,
+          status,
+          responseTimeMs,
+          now,
+          status === 'ONLINE' ? 0 : 1,
+          status === 'ONLINE' ? 1 : 0,
+          JSON.stringify(details),
+          errorMessage ?? null
+        );
+      return;
+    }
+
+    const consecutiveFailures = status === 'ONLINE' ? 0 : existing.consecutive_failures + 1;
+    const consecutiveSuccesses = status === 'ONLINE' ? existing.consecutive_successes + 1 : 0;
+
+    this.sqlite
+      .prepare(
+        `UPDATE service_status
+         SET name = ?, status = ?, response_time_ms = ?, last_checked_at = ?, consecutive_failures = ?, consecutive_successes = ?, details_json = ?, error_message = ?
+         WHERE service_key = ?`
+      )
+      .run(
+        name,
+        status,
+        responseTimeMs,
+        now,
+        consecutiveFailures,
+        consecutiveSuccesses,
+        JSON.stringify(details),
+        errorMessage ?? null,
+        serviceKey
+      );
+  }
+
+  public listServiceIncidents(limit = 20): ServiceIncidentRecord[] {
+    const rows = this.sqlite
+      .prepare('SELECT * FROM service_incidents ORDER BY created_at DESC LIMIT ?')
+      .all(limit) as any[];
+    return rows.map((r) => ({
+      id: r.id,
+      serviceKey: r.service_key,
+      title: r.title,
+      description: r.description,
+      status: r.status,
+      severity: r.severity,
+      startedAt: r.started_at,
+      resolvedAt: r.resolved_at,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    }));
+  }
+
+  public createIncident(
+    serviceKey: string,
+    title: string,
+    description: string,
+    severity: 'MINOR' | 'MAJOR' | 'CRITICAL' = 'MAJOR'
+  ): ServiceIncidentRecord {
+    const id = crypto.randomUUID();
+    const now = this.now();
+    this.sqlite
+      .prepare(
+        `INSERT INTO service_incidents (id, service_key, title, description, status, severity, started_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'INVESTIGATING', ?, ?, ?, ?)`
+      )
+      .run(id, serviceKey, title, description, severity, now, now, now);
+    return {
+      id,
+      serviceKey,
+      title,
+      description,
+      status: 'INVESTIGATING',
+      severity,
+      startedAt: now,
+      resolvedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
+  public resolveIncident(incidentId: string) {
+    const now = this.now();
+    this.sqlite
+      .prepare("UPDATE service_incidents SET status = 'RESOLVED', resolved_at = ?, updated_at = ? WHERE id = ?")
+      .run(now, now, incidentId);
+  }
+
+  public listWebsiteAnnouncements(limit = 20): WebsiteAnnouncementRecord[] {
+    const rows = this.sqlite
+      .prepare('SELECT * FROM website_announcements ORDER BY created_at DESC LIMIT ?')
+      .all(limit) as any[];
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      content: r.content,
+      authorId: r.author_id,
+      version: r.version,
+      category: r.category,
+      discordMessageId: r.discord_message_id,
+      channelId: r.channel_id,
+      createdAt: r.created_at,
+    }));
+  }
+
+  public createWebsiteAnnouncement(
+    title: string,
+    content: string,
+    authorId: string,
+    version?: string | null,
+    category: 'UPDATE' | 'PATCH' | 'ANNOUNCEMENT' | 'MAINTENANCE' = 'UPDATE',
+    channelId?: string | null,
+    discordMessageId?: string | null
+  ): WebsiteAnnouncementRecord {
+    const id = crypto.randomUUID();
+    const now = this.now();
+    this.sqlite
+      .prepare(
+        `INSERT INTO website_announcements (id, title, content, author_id, version, category, discord_message_id, channel_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        id,
+        title,
+        content,
+        authorId,
+        version ?? null,
+        category,
+        discordMessageId ?? null,
+        channelId ?? null,
+        now
+      );
+    return {
+      id,
+      title,
+      content,
+      authorId,
+      version: version ?? null,
+      category,
+      discordMessageId: discordMessageId ?? null,
+      channelId: channelId ?? null,
+      createdAt: now,
+    };
+  }
+
+  public listScheduledMaintenance(): ScheduledMaintenanceRecord[] {
+    const rows = this.sqlite
+      .prepare('SELECT * FROM scheduled_maintenance ORDER BY scheduled_start_at DESC LIMIT 20')
+      .all() as any[];
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      description: r.description,
+      services: JSON.parse(r.services_json || '[]'),
+      status: r.status,
+      scheduledStartAt: r.scheduled_start_at,
+      scheduledEndAt: r.scheduled_end_at,
+      createdAt: r.created_at,
+    }));
+  }
+
+  public createScheduledMaintenance(
+    title: string,
+    description: string,
+    services: string[],
+    scheduledStartAt: string,
+    scheduledEndAt: string
+  ): ScheduledMaintenanceRecord {
+    const id = crypto.randomUUID();
+    const now = this.now();
+    this.sqlite
+      .prepare(
+        `INSERT INTO scheduled_maintenance (id, title, description, services_json, status, scheduled_start_at, scheduled_end_at, created_at)
+         VALUES (?, ?, ?, ?, 'SCHEDULED', ?, ?, ?)`
+      )
+      .run(id, title, description, JSON.stringify(services), scheduledStartAt, scheduledEndAt, now);
+    return {
+      id,
+      title,
+      description,
+      services,
+      status: 'SCHEDULED',
+      scheduledStartAt,
+      scheduledEndAt,
+      createdAt: now,
+    };
+  }
+
+  public updateMaintenanceStatus(id: string, status: 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED') {
+    this.sqlite.prepare('UPDATE scheduled_maintenance SET status = ? WHERE id = ?').run(status, id);
+  }
+
+  public getStatusConfig(discordGuildId: string): StatusConfigRecord {
+    const guild = this.getGuildByDiscordId(discordGuildId);
+    if (!guild) {
+      return {
+        guildId: discordGuildId,
+        statusChannelId: null,
+        updatesChannelId: null,
+        pingRoleId: null,
+        timezone: 'Asia/Kolkata',
+        updatedAt: this.now(),
+      };
+    }
+    const r = this.sqlite.prepare('SELECT * FROM status_configs WHERE guild_id = ?').get(guild.id) as any;
+    if (!r) {
+      return {
+        guildId: discordGuildId,
+        statusChannelId: null,
+        updatesChannelId: null,
+        pingRoleId: null,
+        timezone: 'Asia/Kolkata',
+        updatedAt: this.now(),
+      };
+    }
+    return {
+      guildId: discordGuildId,
+      statusChannelId: r.status_channel_id,
+      updatesChannelId: r.updates_channel_id,
+      pingRoleId: r.ping_role_id,
+      timezone: r.timezone,
+      updatedAt: r.updated_at,
+    };
+  }
+
+  public updateStatusConfig(discordGuildId: string, patch: Partial<StatusConfigRecord>): StatusConfigRecord {
+    const guild = this.ensureGuild({ discordGuildId, name: discordGuildId });
+    const current = this.getStatusConfig(discordGuildId);
+    const updated: StatusConfigRecord = {
+      ...current,
+      ...patch,
+      guildId: discordGuildId,
+      updatedAt: this.now(),
+    };
+
+    const existing = this.sqlite.prepare('SELECT guild_id FROM status_configs WHERE guild_id = ?').get(guild.id);
+    if (existing) {
+      this.sqlite
+        .prepare(
+          `UPDATE status_configs
+           SET status_channel_id = ?, updates_channel_id = ?, ping_role_id = ?, timezone = ?, updated_at = ?
+           WHERE guild_id = ?`
+        )
+        .run(
+          updated.statusChannelId,
+          updated.updatesChannelId,
+          updated.pingRoleId,
+          updated.timezone,
+          updated.updatedAt,
+          guild.id
+        );
+    } else {
+      this.sqlite
+        .prepare(
+          `INSERT INTO status_configs (guild_id, status_channel_id, updates_channel_id, ping_role_id, timezone, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?)`
+        )
+        .run(
+          guild.id,
+          updated.statusChannelId,
+          updated.updatesChannelId,
+          updated.pingRoleId,
+          updated.timezone,
+          updated.updatedAt
+        );
+    }
+    return updated;
   }
 }

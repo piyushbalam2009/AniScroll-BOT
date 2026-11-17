@@ -10,6 +10,7 @@ import { SchedulerService } from './services/jobs/SchedulerService';
 import { getMusicService } from './services/music/MusicService';
 import { getWebsiteWatchlistService } from './services/watchlist/WebsiteWatchlistService';
 import { AniGuessService, getAniGuessService } from './services/anime/AniGuessService';
+import { getStatusMonitorService } from './services/status/StatusMonitorService';
 
 const log = createModuleLogger('BotRuntime');
 
@@ -235,6 +236,7 @@ export class AniScrollBotRuntime {
         log.warn({ err: msg }, 'Slash command registration warning');
       });
       this.scheduler.start(client);
+      getStatusMonitorService().start(client);
     });
 
     client.on('error', (err) => {
@@ -367,6 +369,7 @@ export class AniScrollBotRuntime {
 
   public async stop() {
     this.scheduler.stop();
+    getStatusMonitorService().stop();
     this.aniGuessService?.disposeAll();
     if (this.client) {
       await this.client.destroy();
