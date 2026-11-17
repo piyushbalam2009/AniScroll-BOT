@@ -113,6 +113,9 @@ export class GuildMusicQueue {
   public voiceChannelId: string | null = null;
   public trackStartedAtMs: number | null = null;
   public lastKnownPositionMs = 0;
+  public chapters: Array<{ title: string; start: number; end: number; duration: number }> = [];
+  public segments: Array<{ category: string; start: number; end: number; duration: number }> = [];
+  public sponsorBlockCategories: string[] = ['sponsor', 'selfpromo'];
 
   constructor(defaultVolume = 65) {
     this.volume = defaultVolume;
@@ -994,6 +997,57 @@ export class MusicService {
     };
   }
 
+  public async searchLavaSearch(query: string, types?: string[]): Promise<{
+    tracks: Track[];
+    albums: any[];
+    artists: any[];
+    playlists: any[];
+  }> {
+    const node = this.requireNode();
+    const protocol = this.config.LAVALINK_SECURE ? 'https' : 'http';
+    const baseUrl = `${protocol}://${this.config.LAVALINK_HOST}:${this.config.LAVALINK_PORT}`;
+    const url = new URL(`${baseUrl}/v4/loadsearch`);
+    url.searchParams.set('query', query);
+    if (types && types.length > 0) {
+      url.searchParams.set('types', types.join(','));
+    }
+    const res = await this.fetchImpl(url.toString(), {
+      headers: { Authorization: this.config.LAVALINK_PASSWORD },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) {
+      throw new AppError(ERROR_CODES.MUSIC_SOURCE_UNAVAILABLE, `LavaSearch failed (HTTP ${res.status})`, 502);
+    }
+    const data = (await res.json()) as any;
+    return {
+      tracks: data.tracks || [],
+      albums: data.albums || [],
+      artists: data.artists || [],
+      playlists: data.playlists || [],
+    };
+  }
+
+  public async setSponsorBlockCategories(guildId: string, categories: string[]): Promise<void> {
+    const queue = this.getQueue(guildId);
+    queue.sponsorBlockCategories = categories;
+    const player = this.getPlayer(guildId);
+    const node = this.requireNode();
+    if (!player) return;
+    const protocol = this.config.LAVALINK_SECURE ? 'https' : 'http';
+    const baseUrl = `${protocol}://${this.config.LAVALINK_HOST}:${this.config.LAVALINK_PORT}`;
+    const sessionId = node.sessionId;
+    if (!sessionId) return;
+    await this.fetchImpl(`${baseUrl}/v4/sessions/${sessionId}/players/${guildId}/sponsorblock/categories`, {
+      method: 'PUT',
+      headers: {
+        Authorization: this.config.LAVALINK_PASSWORD,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(categories),
+      signal: AbortSignal.timeout(5000),
+    }).catch(() => undefined);
+  }
+
   private clearInactivityTimer(guildId: string) {
     const existing = this.inactivityTimers.get(guildId);
     if (existing) {
@@ -1063,6 +1117,15 @@ export class MusicService {
         queue.trackStartedAtMs = Date.now();
         queue.lastKnownPositionMs = 0;
         await this.renderHook.onTrackChange?.(options.guildId, queue);
+      });
+
+      (player as any).on('event', (data: any) => {
+        if (!data) return;
+        if (data.type === 'ChaptersLoaded') {
+          queue.chapters = data.chapters || [];
+        } else if (data.type === 'SegmentsLoaded') {
+          queue.segments = data.segments || [];
+        }
       });
 
       player.on('end', async (event) => {

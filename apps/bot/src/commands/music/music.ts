@@ -219,8 +219,18 @@ export const musicCommands: BotSlashCommand[] = [
 
       const query = interaction.options.getString('query', true);
       const source = (interaction.options.getString('source') || 'youtube') as PreferredMusicSource;
-      const resolved = await ctx.musicService.searchTracks(query, { source, limit: 10 });
-      const top10 = resolved.tracks.slice(0, 10);
+      let tracks: Track[] = [];
+      try {
+        const lava = await ctx.musicService.searchLavaSearch(query, ['tracks', 'albums', 'playlists', 'artists']);
+        tracks = lava.tracks.slice(0, 10);
+      } catch {
+        // fallback
+      }
+      if (tracks.length === 0) {
+        const resolved = await ctx.musicService.searchTracks(query, { source, limit: 10 });
+        tracks = resolved.tracks.slice(0, 10);
+      }
+      const top10 = tracks;
 
       if (top10.length === 0) {
         await interaction.editReply({
@@ -565,6 +575,81 @@ export const musicCommands: BotSlashCommand[] = [
       ctx.musicService.getQueue(interaction.guildId).stay247 = next;
       await interaction.reply({
         embeds: [createMonochromeEmbed({ title: '24/7 Mode Updated', description: `24/7 mode is now **${next ? 'ENABLED' : 'DISABLED'}**.` })],
+      });
+    },
+  },
+  {
+    name: 'chapters',
+    category: 'music',
+    data: new SlashCommandBuilder()
+      .setName('chapters')
+      .setDescription('Display available YouTube chapters for the currently playing track'),
+    async execute(interaction, ctx) {
+      if (!interaction.guildId) return;
+      const queue = ctx.musicService.getQueue(interaction.guildId);
+      if (!queue.current) {
+        await interaction.reply({ ephemeral: true, embeds: [createErrorEmbed('No track is currently playing.')] });
+        return;
+      }
+      if (!queue.chapters || queue.chapters.length === 0) {
+        await interaction.reply({ ephemeral: true, embeds: [createMonochromeEmbed({ title: 'No Chapters Available', description: `No chapters were found for **${queue.current.title}**.` })] });
+        return;
+      }
+
+      const lines = queue.chapters.map(
+        (ch, i) => `**${i + 1}.** ${ch.title} — \`${formatDuration(ch.start)}\``
+      );
+
+      await interaction.reply({
+        embeds: [
+          createMonochromeEmbed({
+            title: `Chapters · ${queue.current.title}`,
+            description: lines.join('\n'),
+          }),
+        ],
+      });
+    },
+  },
+  {
+    name: 'sponsorblock',
+    category: 'music',
+    data: new SlashCommandBuilder()
+      .setName('sponsorblock')
+      .setDescription('Configure SponsorBlock categories for skipping sponsors and self-promo')
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+      .addStringOption((o) =>
+        o
+          .setName('mode')
+          .setDescription('SponsorBlock mode')
+          .setRequired(true)
+          .addChoices(
+            { name: 'Default (Sponsor & Self-Promo)', value: 'default' },
+            { name: 'All Categories', value: 'all' },
+            { name: 'Disable SponsorBlock', value: 'off' }
+          )
+      ),
+    async execute(interaction, ctx) {
+      if (!interaction.guildId) return;
+      assertMusicControlAccess(interaction, ctx);
+      const mode = interaction.options.getString('mode', true);
+      let categories: string[] = [];
+      if (mode === 'default') {
+        categories = ['sponsor', 'selfpromo'];
+      } else if (mode === 'all') {
+        categories = ['sponsor', 'selfpromo', 'interaction', 'intro', 'outro', 'music_offtopic'];
+      } else if (mode === 'off') {
+        categories = [];
+      }
+
+      await ctx.musicService.setSponsorBlockCategories(interaction.guildId, categories);
+
+      await interaction.reply({
+        embeds: [
+          createMonochromeEmbed({
+            title: 'SponsorBlock Configured',
+            description: `SponsorBlock mode set to **${mode.toUpperCase()}** (${categories.length > 0 ? categories.join(', ') : 'disabled'}).`,
+          }),
+        ],
       });
     },
   },
