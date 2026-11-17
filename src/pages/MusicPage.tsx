@@ -8,20 +8,6 @@ interface MusicPageProps {
   onToast: (msg: string) => void;
 }
 
-function getStatusBadgeClass(status: string | undefined): string {
-  switch (status) {
-    case 'online':
-      return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400';
-    case 'connecting':
-    case 'reconnecting':
-      return 'border-amber-500/40 bg-amber-500/10 text-amber-300';
-    case 'auth_failed':
-      return 'border-red-500/50 bg-red-500/10 text-red-400';
-    default:
-      return 'border-[#2A2A2A] bg-[#181818] text-[#D4D4D4]';
-  }
-}
-
 export function MusicPage({ guild, health, onToast }: MusicPageProps) {
   const [music, setMusic] = useState<any>(null);
   const [lavalink, setLavalink] = useState<any>(health?.lavalink || null);
@@ -78,7 +64,11 @@ export function MusicPage({ guild, health, onToast }: MusicPageProps) {
   };
 
   if (!music) {
-    return <div className="h-48 bg-[#111111] border border-[#2A2A2A] rounded-lg animate-pulse" />;
+    return (
+      <div className="space-y-6">
+        <div className="h-64 bg-[#111114] border border-[#27272A] rounded-lg animate-pulse" />
+      </div>
+    );
   }
 
   const infra = lavalink || health?.lavalink || {};
@@ -97,23 +87,25 @@ export function MusicPage({ guild, health, onToast }: MusicPageProps) {
       {/* Music Infrastructure Section */}
       <section
         aria-labelledby="music-infra-heading"
-        className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-5 space-y-5"
+        className="bg-[#111114] border border-[#27272A] rounded-lg p-5 space-y-5"
       >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#2A2A2A] pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#27272A] pb-4">
           <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-3">
               <Server className="w-4 h-4 text-white" />
               <h2 id="music-infra-heading" className="text-sm font-semibold text-white">
                 Music Infrastructure · Lavalink v4
               </h2>
               <span
                 data-testid="lavalink-status-badge"
-                className={`px-2 py-0.5 text-[11px] font-mono border rounded ${getStatusBadgeClass(infra.status)}`}
+                className={`font-mono text-xs ${
+                  infra.connected ? 'text-emerald-400' : 'text-amber-400'
+                }`}
               >
                 {infra.statusLabel || (infra.connected ? 'Online' : 'Offline')}
               </span>
             </div>
-            <p className="text-xs text-[#A0A0A0] font-mono">
+            <p className="text-xs text-[#A1A1AA] font-mono">
               Node: {infra.host ? `${infra.host}:${infra.port}` : 'Not configured'} · Protocol:{' '}
               {infra.secure ? 'WSS / HTTPS' : 'WS / HTTP'}
               {infra.version ? ` · Lavalink ${infra.version}` : ''}
@@ -124,7 +116,7 @@ export function MusicPage({ guild, health, onToast }: MusicPageProps) {
             <button
               type="button"
               onClick={loadMusicInfra}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-[#181818] border border-[#2A2A2A] text-[#D4D4D4] rounded-md hover:border-white hover:text-white"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-[#18181C] border border-[#27272A] text-[#E4E4E7] rounded-md hover:border-white/70"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Refresh</span>
@@ -133,7 +125,7 @@ export function MusicPage({ guild, health, onToast }: MusicPageProps) {
               type="button"
               disabled={testing}
               onClick={handleTestConnection}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-white text-black rounded-md hover:bg-[#E5E5E5] disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-white text-black rounded-md hover:bg-[#E4E4E7] disabled:opacity-50"
             >
               <Activity className="w-3.5 h-3.5" />
               <span>{testing ? 'Testing...' : 'Test Connection'}</span>
@@ -143,103 +135,75 @@ export function MusicPage({ guild, health, onToast }: MusicPageProps) {
 
         {/* Live Telemetry Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="bg-[#181818] border border-[#2A2A2A] rounded-md p-3.5">
-            <div className="text-[11px] text-[#A0A0A0]">Lavalink Version</div>
+          <div className="bg-[#18181C] border border-[#27272A] rounded-md p-3.5">
+            <div className="text-[11px] text-[#A1A1AA]">Lavalink Version</div>
             <div className="text-base font-semibold font-mono text-white mt-1 tabular-nums">
               {infra.version || 'Unavailable'}
             </div>
-            <div className="text-[11px] text-[#A0A0A0] font-mono mt-0.5 truncate">
+            <div className="text-[11px] text-[#71717A] font-mono mt-0.5 truncate">
               {infra.activeNode?.name || 'No active node'}
             </div>
           </div>
 
-          <div className="bg-[#181818] border border-[#2A2A2A] rounded-md p-3.5">
-            <div className="text-[11px] text-[#A0A0A0]">Player Count</div>
+          <div className="bg-[#18181C] border border-[#27272A] rounded-md p-3.5">
+            <div className="text-[11px] text-[#A1A1AA]">Player Count</div>
             <div className="text-base font-semibold font-mono text-white mt-1 tabular-nums">
               {infra.playerCount ?? 0}
             </div>
-            <div className="text-[11px] text-[#A0A0A0] font-mono mt-0.5">
+            <div className="text-[11px] text-[#71717A] font-mono mt-0.5">
               Playing: {infra.playingPlayerCount ?? 0}
             </div>
           </div>
 
-          <div className="bg-[#181818] border border-[#2A2A2A] rounded-md p-3.5">
-            <div className="text-[11px] text-[#A0A0A0]">Active Voice Connections</div>
+          <div className="bg-[#18181C] border border-[#27272A] rounded-md p-3.5">
+            <div className="text-[11px] text-[#A1A1AA]">Voice Connections</div>
             <div className="text-base font-semibold font-mono text-white mt-1 tabular-nums">
               {infra.activeVoiceConnections ?? 0}
             </div>
-            <div className="text-[11px] text-[#A0A0A0] font-mono mt-0.5">
+            <div className="text-[11px] text-[#71717A] font-mono mt-0.5">
               Guild Queues: {infra.activeGuildQueues ?? 0}
             </div>
           </div>
 
-          <div className="bg-[#181818] border border-[#2A2A2A] rounded-md p-3.5">
-            <div className="text-[11px] text-[#A0A0A0]">Total Queued Tracks</div>
+          <div className="bg-[#18181C] border border-[#27272A] rounded-md p-3.5">
+            <div className="text-[11px] text-[#A1A1AA]">Queued Tracks</div>
             <div className="text-base font-semibold font-mono text-white mt-1 tabular-nums">
               {infra.totalQueuedTracks ?? 0}
             </div>
-            <div className="text-[11px] text-[#A0A0A0] font-mono mt-0.5">
+            <div className="text-[11px] text-[#71717A] font-mono mt-0.5">
               {infra.activeNode?.memoryUsedMb != null
                 ? `Heap: ${infra.activeNode.memoryUsedMb}MB`
-                : 'Awaiting node stats'}
+                : 'Awaiting stats'}
             </div>
           </div>
         </div>
 
         {/* Source Integrations: YouTube & Spotify */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-[#181818] border border-[#2A2A2A] rounded-md p-4 space-y-1.5">
+          <div className="bg-[#18181C] border border-[#27272A] rounded-md p-4 space-y-1.5">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-white">YouTube Integration</span>
-              <span className="text-[11px] font-mono text-[#A0A0A0]">
-                {infra.integrations?.youtube?.ready ? 'Ready' : 'Offline / Unverified'}
+              <span className="text-[11px] font-mono text-[#A1A1AA]">
+                {infra.integrations?.youtube?.ready ? 'Ready' : 'Offline'}
               </span>
             </div>
-            <p className="text-xs text-[#D4D4D4]">
+            <p className="text-xs text-[#D4D4D8]">
               {infra.integrations?.youtube?.statusText || 'Waiting for Lavalink v4 YouTube source status.'}
-            </p>
-            <p className="text-[11px] font-mono text-[#A0A0A0]">
-              YouTube OAuth Refresh Token:{' '}
-              {infra.integrations?.youtube?.oauthConfigured ? 'Configured' : 'Not set (optional)'}
             </p>
           </div>
 
-          <div className="bg-[#181818] border border-[#2A2A2A] rounded-md p-4 space-y-1.5">
+          <div className="bg-[#18181C] border border-[#27272A] rounded-md p-4 space-y-1.5">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-white">Spotify Integration</span>
-              <span className="text-[11px] font-mono text-[#A0A0A0]">
+              <span className="text-[11px] font-mono text-[#A1A1AA]">
                 {infra.integrations?.spotify?.ready ? 'Ready' : 'Not Active'}
               </span>
             </div>
-            <p className="text-xs text-[#D4D4D4]">
-              {infra.integrations?.spotify?.statusText || 'Waiting for Spotify credentials & metadata resolution.'}
-            </p>
-            <p className="text-[11px] font-mono text-[#A0A0A0]">
-              Spotify Client Credentials:{' '}
-              {infra.integrations?.spotify?.credentialsConfigured ? 'Configured' : 'Not set (required for Spotify URLs)'}
+            <p className="text-xs text-[#D4D4D8]">
+              {infra.integrations?.spotify?.statusText || 'Waiting for Spotify client credentials.'}
             </p>
           </div>
         </div>
-
-        {/* Active Node Plugins (if connected) */}
-        {infra.activeNode && (
-          <div className="bg-[#181818] border border-[#2A2A2A] rounded-md p-4 space-y-2 text-xs">
-            <div className="font-semibold text-white">Active Node Details</div>
-            <div className="font-mono text-[#A0A0A0] break-all">
-              Node: {infra.activeNode.name || 'primary-lavalink-v4'} · Session: {infra.activeNode.sessionId || 'Pending'}
-            </div>
-            <div className="flex flex-wrap gap-2 pt-1">
-              {(infra.activeNode.plugins || []).map((p: any) => (
-                <span
-                  key={`${p.name}-${p.version}`}
-                  className="px-2 py-0.5 bg-black border border-[#2A2A2A] rounded font-mono text-[11px] text-white"
-                >
-                  {p.name}@{p.version}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Last Connection Error & Real Test Result */}
         {(infra.lastError || lastTestResult) && (
@@ -247,7 +211,7 @@ export function MusicPage({ guild, health, onToast }: MusicPageProps) {
             {infra.lastError && (
               <div
                 data-testid="lavalink-last-error"
-                className="p-3.5 bg-[#181818] border border-red-900/60 rounded-md text-xs text-red-300 flex items-start gap-2.5"
+                className="p-3.5 bg-[#18181C] border border-red-900/60 rounded-md text-xs text-red-300 flex items-start gap-2.5"
               >
                 <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
                 <div className="space-y-1">
@@ -260,10 +224,8 @@ export function MusicPage({ guild, health, onToast }: MusicPageProps) {
             {lastTestResult && (
               <div
                 data-testid="lavalink-test-result"
-                className={`p-3 bg-[#181818] border rounded-md text-xs flex items-start gap-2.5 ${
-                  lastTestResult.success
-                    ? 'border-emerald-500/40 text-emerald-300'
-                    : 'border-amber-500/40 text-amber-200'
+                className={`p-3 bg-[#18181C] border rounded-md text-xs flex items-start gap-2.5 ${
+                  lastTestResult.success ? 'border-emerald-500/40 text-emerald-300' : 'border-amber-500/40 text-amber-200'
                 }`}
               >
                 {lastTestResult.success ? (
@@ -284,14 +246,6 @@ export function MusicPage({ guild, health, onToast }: MusicPageProps) {
           </div>
         )}
 
-        {/* Environment Runtime Note */}
-        {infra.environmentSupport && !infra.environmentSupport.javaInstalled && (
-          <div className="p-3 bg-[#181818] border border-[#2A2A2A] rounded-md text-xs text-[#A0A0A0]">
-            <span className="text-white font-medium">Hosting Architecture Note:</span>{' '}
-            {infra.environmentSupport.note}
-          </div>
-        )}
-
         {/* Configuration Validation */}
         {validationItems.length > 0 && (
           <div className="space-y-2">
@@ -300,23 +254,23 @@ export function MusicPage({ guild, health, onToast }: MusicPageProps) {
               {validationItems.map((item) => (
                 <div
                   key={item.key}
-                  className="bg-[#181818] border border-[#2A2A2A] rounded-md p-3 flex items-start gap-2.5 text-xs"
+                  className="bg-[#18181C] border border-[#27272A] rounded-md p-3 flex items-start gap-2.5 text-xs"
                 >
                   {item.ok ? (
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                   ) : item.required ? (
                     <XCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
                   ) : (
-                    <AlertTriangle className="w-4 h-4 text-[#A0A0A0] shrink-0 mt-0.5" />
+                    <AlertTriangle className="w-4 h-4 text-[#A1A1AA] shrink-0 mt-0.5" />
                   )}
                   <div className="min-w-0">
                     <div className="font-mono text-white">
                       {item.key}{' '}
-                      <span className="text-[10px] text-[#A0A0A0]">
+                      <span className="text-[10px] text-[#A1A1AA]">
                         ({item.required ? 'Required' : 'Optional'})
                       </span>
                     </div>
-                    <div className="text-[#A0A0A0] mt-0.5 break-words">{item.message}</div>
+                    <div className="text-[#A1A1AA] mt-0.5 break-words">{item.message}</div>
                   </div>
                 </div>
               ))}
@@ -328,16 +282,19 @@ export function MusicPage({ guild, health, onToast }: MusicPageProps) {
         <div className="space-y-2">
           <h3 className="text-xs font-semibold text-white">Reconnection History</h3>
           {historyItems.length === 0 ? (
-            <p className="text-xs text-[#A0A0A0]">No connection events logged yet.</p>
+            <p className="text-xs text-[#A1A1AA]">No connection events logged yet.</p>
           ) : (
-            <div className="bg-[#181818] border border-[#2A2A2A] rounded-md divide-y divide-[#2A2A2A] max-h-48 overflow-y-auto">
+            <div className="bg-[#18181C] border border-[#27272A] rounded-md divide-y divide-[#27272A] max-h-48 overflow-y-auto">
               {historyItems.slice(0, 8).map((ev, idx) => (
-                <div key={`${ev.timestamp}-${idx}`} className="px-3 py-2 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <div
+                  key={`${ev.timestamp}-${idx}`}
+                  className="px-3 py-2 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-1"
+                >
                   <div className="min-w-0">
                     <span className="font-mono text-white uppercase mr-2">[{ev.status}]</span>
-                    <span className="text-[#D4D4D4] break-words">{ev.message}</span>
+                    <span className="text-[#D4D4D8] break-words">{ev.message}</span>
                   </div>
-                  <span className="font-mono text-[11px] text-[#A0A0A0] shrink-0 tabular-nums">
+                  <span className="font-mono text-[11px] text-[#71717A] shrink-0 tabular-nums">
                     {new Date(ev.timestamp).toLocaleTimeString()}
                   </span>
                 </div>
@@ -348,8 +305,11 @@ export function MusicPage({ guild, health, onToast }: MusicPageProps) {
       </section>
 
       {/* Guild Playback & Queue Settings */}
-      <form onSubmit={handleSave} className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-5 space-y-5">
-        <div className="flex items-center justify-between">
+      <form
+        onSubmit={handleSave}
+        className="bg-[#111114] border border-[#27272A] rounded-lg p-5 space-y-5"
+      >
+        <div className="flex items-center justify-between pb-3 border-b border-[#27272A]">
           <h3 className="text-sm font-semibold text-white">Playback &amp; Queue Configuration</h3>
           <label className="inline-flex items-center gap-2 text-xs cursor-pointer">
             <input
@@ -364,7 +324,7 @@ export function MusicPage({ guild, health, onToast }: MusicPageProps) {
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label htmlFor="m-vol" className="block text-xs text-[#A0A0A0] mb-1">
+            <label htmlFor="m-vol" className="block text-xs text-[#A1A1AA] mb-1">
               Default Volume ({music.defaultVolume}%)
             </label>
             <input
@@ -378,7 +338,7 @@ export function MusicPage({ guild, health, onToast }: MusicPageProps) {
             />
           </div>
           <div>
-            <label htmlFor="m-maxvol" className="block text-xs text-[#A0A0A0] mb-1">
+            <label htmlFor="m-maxvol" className="block text-xs text-[#A1A1AA] mb-1">
               Max Volume Cap
             </label>
             <input
@@ -388,11 +348,11 @@ export function MusicPage({ guild, health, onToast }: MusicPageProps) {
               max={150}
               value={music.maxVolume}
               onChange={(e) => setMusic({ ...music, maxVolume: Number(e.target.value) })}
-              className="w-full bg-[#181818] border border-[#2A2A2A] rounded-md px-3 py-2 text-sm text-white font-mono tabular-nums"
+              className="w-full bg-[#18181C] border border-[#27272A] rounded-md px-3 py-2 text-sm text-white font-mono tabular-nums"
             />
           </div>
           <div>
-            <label htmlFor="m-q" className="block text-xs text-[#A0A0A0] mb-1">
+            <label htmlFor="m-q" className="block text-xs text-[#A1A1AA] mb-1">
               Max Queue Size
             </label>
             <input
@@ -402,13 +362,13 @@ export function MusicPage({ guild, health, onToast }: MusicPageProps) {
               max={1000}
               value={music.maxQueueSize}
               onChange={(e) => setMusic({ ...music, maxQueueSize: Number(e.target.value) })}
-              className="w-full bg-[#181818] border border-[#2A2A2A] rounded-md px-3 py-2 text-sm text-white font-mono tabular-nums"
+              className="w-full bg-[#18181C] border border-[#27272A] rounded-md px-3 py-2 text-sm text-white font-mono tabular-nums"
             />
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-          <label className="flex items-center gap-2 p-3 bg-[#181818] border border-[#2A2A2A] rounded-md cursor-pointer">
+          <label className="flex items-center gap-2 p-3 bg-[#18181C] border border-[#27272A] rounded-md cursor-pointer">
             <input
               type="checkbox"
               checked={music.stay247}
@@ -417,7 +377,7 @@ export function MusicPage({ guild, health, onToast }: MusicPageProps) {
             />
             <span>24/7 Voice Persistence</span>
           </label>
-          <label className="flex items-center gap-2 p-3 bg-[#181818] border border-[#2A2A2A] rounded-md cursor-pointer">
+          <label className="flex items-center gap-2 p-3 bg-[#18181C] border border-[#27272A] rounded-md cursor-pointer">
             <input
               type="checkbox"
               checked={music.autoplayEnabled}
@@ -426,7 +386,7 @@ export function MusicPage({ guild, health, onToast }: MusicPageProps) {
             />
             <span>Autoplay Related Tracks</span>
           </label>
-          <label className="flex items-center gap-2 p-3 bg-[#181818] border border-[#2A2A2A] rounded-md cursor-pointer">
+          <label className="flex items-center gap-2 p-3 bg-[#18181C] border border-[#27272A] rounded-md cursor-pointer">
             <input
               type="checkbox"
               checked={music.announceNowPlaying}
@@ -438,7 +398,7 @@ export function MusicPage({ guild, health, onToast }: MusicPageProps) {
         </div>
 
         <div>
-          <span className="block text-xs text-[#A0A0A0] mb-2">DJ Roles</span>
+          <span className="block text-xs text-[#A1A1AA] mb-2">DJ Roles</span>
           <div className="flex flex-wrap gap-2">
             {guild.roles.map((role) => {
               const selected = music.djRoleIds.includes(role.id);
@@ -455,7 +415,7 @@ export function MusicPage({ guild, health, onToast }: MusicPageProps) {
                   className={`px-3 py-1.5 text-xs rounded-md border transition-colors ${
                     selected
                       ? 'bg-white text-black border-white font-medium'
-                      : 'bg-[#181818] text-[#A0A0A0] border-[#2A2A2A] hover:text-white'
+                      : 'bg-[#18181C] text-[#A1A1AA] border-[#27272A] hover:text-white'
                   }`}
                 >
                   {role.name}
@@ -465,7 +425,10 @@ export function MusicPage({ guild, health, onToast }: MusicPageProps) {
           </div>
         </div>
 
-        <button type="submit" className="px-4 py-2 text-xs font-semibold bg-white text-black rounded-md hover:bg-[#E5E5E5]">
+        <button
+          type="submit"
+          className="px-4 py-2 text-xs font-semibold bg-white text-black rounded-md hover:bg-[#E4E4E7]"
+        >
           Save Music Settings
         </button>
       </form>

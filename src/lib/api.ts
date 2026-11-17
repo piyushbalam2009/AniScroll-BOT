@@ -54,6 +54,9 @@ export async function apiRequest<T = any>(
 
   const data = await res.json().catch(() => null);
   if (!res.ok || (data && data.ok === false)) {
+    if (res.status === 401 && window.location.pathname !== '/login' && window.location.pathname !== '/') {
+      window.location.href = '/login';
+    }
     throw new Error(data?.message || `Request failed (${res.status})`);
   }
   return data as T;

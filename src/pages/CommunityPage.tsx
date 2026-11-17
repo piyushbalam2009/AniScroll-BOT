@@ -208,7 +208,12 @@ export function CommunityPage({ guild, onToast }: CommunityPageProps) {
   };
 
   if (!welcome || !community || !animeConfig) {
-    return <div className="h-48 bg-[#111111] border border-[#2A2A2A] rounded-lg animate-pulse" />;
+    return (
+      <div className="space-y-6">
+        <div className="h-12 bg-[#111114] border border-[#27272A] rounded-lg animate-pulse" />
+        <div className="h-64 bg-[#111114] border border-[#27272A] rounded-lg animate-pulse" />
+      </div>
+    );
   }
 
   const recStats = community.recommendations || {
@@ -226,21 +231,22 @@ export function CommunityPage({ guild, onToast }: CommunityPageProps) {
 
   return (
     <div className="space-y-6">
-      <div className="inline-flex flex-wrap items-center gap-1 p-1 bg-[#111111] border border-[#2A2A2A] rounded-md">
+      {/* Segmented Tab Navigation */}
+      <div className="inline-flex flex-wrap items-center gap-1 p-1 bg-[#111114] border border-[#27272A] rounded-md">
         {[
-          { id: 'recommendations', label: 'Community Recommendations' },
+          { id: 'recommendations', label: 'Recommendations' },
           { id: 'welcome', label: 'Welcome' },
           { id: 'roles', label: 'Reaction Roles' },
           { id: 'suggestions', label: 'Suggestions' },
-          { id: 'tickets', label: 'Tickets' },
+          { id: 'tickets', label: 'Support Tickets' },
           { id: 'polls', label: 'Polls & Giveaways' },
         ].map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setTab(t.id as CommunityTab)}
-            className={`px-3 py-1.5 text-xs font-medium rounded transition-colors whitespace-nowrap shrink-0 ${
-              tab === t.id ? 'bg-white text-black' : 'text-[#A0A0A0] hover:text-white'
+            className={`px-3.5 py-1.5 text-xs font-medium rounded transition-colors whitespace-nowrap shrink-0 ${
+              tab === t.id ? 'bg-white text-black font-semibold' : 'text-[#A1A1AA] hover:text-white'
             }`}
           >
             {t.label}
@@ -252,61 +258,47 @@ export function CommunityPage({ guild, onToast }: CommunityPageProps) {
         <div className="space-y-6">
           {/* KPI Summary Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-4">
-              <div className="text-[11px] font-mono uppercase tracking-wider text-[#A0A0A0]">
-                Total Recommendations
-              </div>
+            <div className="bg-[#111114] border border-[#27272A] rounded-lg p-4">
+              <div className="text-xs text-[#A1A1AA]">Total Recommendations</div>
               <div className="mt-1.5 text-2xl font-semibold text-white font-mono tabular-nums">
                 {recStats.totalRecommendations}
               </div>
-              <div className="mt-1 text-xs text-[#6E6E6E]">
-                Public cards via /anime recommendation
-              </div>
+              <div className="mt-1 text-xs text-[#71717A]">Public cards via /anime recommendation</div>
             </div>
 
-            <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-4">
-              <div className="text-[11px] font-mono uppercase tracking-wider text-[#A0A0A0]">
-                Most Recommended Anime
-              </div>
+            <div className="bg-[#111114] border border-[#27272A] rounded-lg p-4">
+              <div className="text-xs text-[#A1A1AA]">Top Recommended Anime</div>
               <div className="mt-1.5 text-sm font-semibold text-white truncate">
                 {recStats.topRecommendedAnime[0]?.animeTitle || 'No recommendations yet'}
               </div>
-              <div className="mt-1 text-xs text-[#6E6E6E] font-mono tabular-nums">
+              <div className="mt-1 text-xs text-[#71717A] font-mono tabular-nums">
                 {recStats.topRecommendedAnime[0]
-                  ? `Hoshika ID #${recStats.topRecommendedAnime[0].hoshikaShortId} · ${recStats.topRecommendedAnime[0].count}x`
+                  ? `ID #${recStats.topRecommendedAnime[0].hoshikaShortId} · ${recStats.topRecommendedAnime[0].count}x`
                   : 'Waiting for activity'}
               </div>
             </div>
 
-            <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-4">
-              <div className="text-[11px] font-mono uppercase tracking-wider text-[#A0A0A0]">
-                Top Recommending Member
-              </div>
+            <div className="bg-[#111114] border border-[#27272A] rounded-lg p-4">
+              <div className="text-xs text-[#A1A1AA]">Top Recommending Member</div>
               <div className="mt-1.5 text-sm font-semibold text-white truncate">
                 {recStats.topRecommendingMembers[0]
                   ? `@${recStats.topRecommendingMembers[0].username}`
-                  : 'No active members yet'}
+                  : 'No active members'}
               </div>
-              <div className="mt-1 text-xs text-[#6E6E6E] font-mono tabular-nums">
+              <div className="mt-1 text-xs text-[#71717A] font-mono tabular-nums">
                 {recStats.topRecommendingMembers[0]
-                  ? `${recStats.topRecommendingMembers[0].count} published recommendation(s)`
+                  ? `${recStats.topRecommendingMembers[0].count} published`
                   : 'Run /anime recommendation'}
               </div>
             </div>
 
-            <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-4">
-              <div className="text-[11px] font-mono uppercase tracking-wider text-[#A0A0A0]">
-                Command Status
-              </div>
-              <div className="mt-1.5 text-sm font-semibold text-white">
+            <div className="bg-[#111114] border border-[#27272A] rounded-lg p-4">
+              <div className="text-xs text-[#A1A1AA]">Command Status</div>
+              <div className="mt-1.5 text-sm font-semibold text-white font-mono">
                 {animeConfig.recommendationEnabled !== false ? 'ENABLED' : 'DISABLED'}
               </div>
-              <div className="mt-1 text-xs text-[#6E6E6E] font-mono tabular-nums">
-                Cooldown: {animeConfig.recommendationCooldownSeconds ?? 15}s ·{' '}
-                {Array.isArray(animeConfig.recommendationAllowedChannelIds) &&
-                animeConfig.recommendationAllowedChannelIds.length > 0
-                  ? `${animeConfig.recommendationAllowedChannelIds.length} restricted channel(s)`
-                  : 'All text channels'}
+              <div className="mt-1 text-xs text-[#71717A] font-mono tabular-nums">
+                Cooldown: {animeConfig.recommendationCooldownSeconds ?? 15}s
               </div>
             </div>
           </div>
@@ -314,15 +306,13 @@ export function CommunityPage({ guild, onToast }: CommunityPageProps) {
           {/* Administrator Configuration */}
           <form
             onSubmit={saveRecommendationSettings}
-            className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-5 space-y-4"
+            className="bg-[#111114] border border-[#27272A] rounded-lg p-5 space-y-4"
           >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#222222] pb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#27272A] pb-3">
               <div>
-                <h2 className="text-sm font-semibold text-white">
-                  /anime recommendation Configuration
-                </h2>
-                <p className="text-xs text-[#A0A0A0] mt-0.5">
-                  Control public community anime recommendations, channel restrictions, per-user cooldowns, and analytics tracking.
+                <h2 className="text-sm font-semibold text-white">/anime recommendation Settings</h2>
+                <p className="text-xs text-[#A1A1AA] mt-0.5">
+                  Control channel restrictions, per-user cooldowns, and public card publishing.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-4">
@@ -349,17 +339,14 @@ export function CommunityPage({ guild, onToast }: CommunityPageProps) {
                     }
                     className="accent-white"
                   />
-                  <span>Enable Analytics</span>
+                  <span>Analytics</span>
                 </label>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label
-                  htmlFor="rec-cooldown"
-                  className="block text-xs text-[#A0A0A0] mb-1"
-                >
+                <label htmlFor="rec-cooldown" className="block text-xs text-[#A1A1AA] mb-1.5">
                   Per-User Cooldown (seconds)
                 </label>
                 <input
@@ -374,15 +361,15 @@ export function CommunityPage({ guild, onToast }: CommunityPageProps) {
                       recommendationCooldownSeconds: Math.max(0, Number(e.target.value) || 0),
                     })
                   }
-                  className="w-full bg-[#181818] border border-[#2A2A2A] rounded-md px-3 py-2 text-sm text-white font-mono tabular-nums"
+                  className="w-full bg-[#18181C] border border-[#27272A] rounded-md px-3 py-2 text-sm text-white font-mono tabular-nums"
                 />
               </div>
 
               <div className="md:col-span-2">
-                <span className="block text-xs text-[#A0A0A0] mb-1">
-                  Restrict Recommendation Posting to Selected Channels (leave empty to allow all text channels)
+                <span className="block text-xs text-[#A1A1AA] mb-1.5">
+                  Restrict Recommendation Channels (leave empty to allow all text channels)
                 </span>
-                <div className="flex flex-wrap gap-2 p-2.5 bg-[#181818] border border-[#2A2A2A] rounded-md">
+                <div className="flex flex-wrap gap-2 p-2.5 bg-[#18181C] border border-[#27272A] rounded-md">
                   {guild.channels
                     .filter((c) => c.type === 'text')
                     .map((c) => {
@@ -397,7 +384,7 @@ export function CommunityPage({ guild, onToast }: CommunityPageProps) {
                           className={`px-2.5 py-1 text-xs font-mono rounded border transition-colors ${
                             selected
                               ? 'bg-white text-black border-white font-semibold'
-                              : 'bg-[#111111] text-[#A0A0A0] border-[#2A2A2A] hover:text-white'
+                              : 'bg-[#111114] text-[#A1A1AA] border-[#27272A] hover:text-white'
                           }`}
                         >
                           #{c.name}
@@ -409,53 +396,41 @@ export function CommunityPage({ guild, onToast }: CommunityPageProps) {
             </div>
 
             <div className="flex items-center justify-between pt-1">
-              <span className="text-xs text-[#6E6E6E] font-mono">
-                Uses Hoshika API (GET /api/v1/search &amp; GET /api/v1/anime/&#123;shortId&#125;?locale=en)
+              <span className="text-xs text-[#71717A] font-mono">
+                Uses Hoshika API (GET /api/v1/search &amp; /api/v1/anime/&#123;shortId&#125;)
               </span>
               <button
                 type="submit"
-                className="px-4 py-2 text-xs font-semibold bg-white text-black rounded-md hover:bg-[#E5E5E5]"
+                className="px-4 py-2 text-xs font-semibold bg-white text-black rounded-md hover:bg-[#E4E4E7]"
               >
                 Save Recommendation Settings
               </button>
             </div>
           </form>
 
-          {/* Analytics Breakdown: Top Anime, Active Members, Channel Activity */}
+          {/* Analytics Breakdown Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-5 space-y-3">
-              <h3 className="text-xs font-mono uppercase tracking-wider text-[#A0A0A0]">
-                Most Recommended Anime
-              </h3>
+            <div className="bg-[#111114] border border-[#27272A] rounded-lg p-5 space-y-3">
+              <h3 className="text-xs font-semibold text-white">Most Recommended Anime</h3>
               {recStats.topRecommendedAnime.length === 0 ? (
-                <p className="text-xs text-[#6E6E6E]">No recommendations recorded yet.</p>
+                <p className="text-xs text-[#71717A]">No recommendations recorded yet.</p>
               ) : (
                 <div className="space-y-2.5">
                   {recStats.topRecommendedAnime.map((item: any, idx: number) => (
                     <div
                       key={item.hoshikaShortId}
-                      className="flex items-center justify-between gap-2 border-b border-[#1E1E1E] pb-2 last:border-0 last:pb-0"
+                      className="flex items-center justify-between gap-2 border-b border-[#1E1E24] pb-2 last:border-0 last:pb-0"
                     >
                       <div className="min-w-0">
                         <div className="text-xs font-medium text-white truncate">
                           {idx + 1}. {item.animeTitle}
                         </div>
-                        <div className="text-[11px] font-mono text-[#6E6E6E] flex items-center gap-2">
-                          <span>Hoshika ID #{item.hoshikaShortId}</span>
-                          {item.aniscrollUrl && (
-                            <a
-                              href={item.aniscrollUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-[#A0A0A0] underline hover:text-white"
-                            >
-                              aniscroll.in
-                            </a>
-                          )}
+                        <div className="text-[11px] font-mono text-[#71717A]">
+                          ID #{item.hoshikaShortId}
                         </div>
                       </div>
                       <span className="text-xs font-mono font-semibold text-white tabular-nums shrink-0">
-                        {item.count} rec{item.count === 1 ? '' : 's'}
+                        {item.count}x
                       </span>
                     </div>
                   ))}
@@ -463,25 +438,23 @@ export function CommunityPage({ guild, onToast }: CommunityPageProps) {
               )}
             </div>
 
-            <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-5 space-y-3">
-              <h3 className="text-xs font-mono uppercase tracking-wider text-[#A0A0A0]">
-                Most Active Recommending Members
-              </h3>
+            <div className="bg-[#111114] border border-[#27272A] rounded-lg p-5 space-y-3">
+              <h3 className="text-xs font-semibold text-white">Top Recommending Members</h3>
               {recStats.topRecommendingMembers.length === 0 ? (
-                <p className="text-xs text-[#6E6E6E]">No member activity recorded yet.</p>
+                <p className="text-xs text-[#71717A]">No member activity recorded yet.</p>
               ) : (
                 <div className="space-y-2.5">
                   {recStats.topRecommendingMembers.map((member: any, idx: number) => (
                     <div
                       key={member.discordUserId}
-                      className="flex items-center justify-between gap-2 border-b border-[#1E1E1E] pb-2 last:border-0 last:pb-0"
+                      className="flex items-center justify-between gap-2 border-b border-[#1E1E24] pb-2 last:border-0 last:pb-0"
                     >
                       <div className="min-w-0">
                         <div className="text-xs font-medium text-white truncate">
                           {idx + 1}. @{member.username}
                         </div>
-                        <div className="text-[11px] font-mono text-[#6E6E6E]">
-                          Discord ID: {member.discordUserId}
+                        <div className="text-[11px] font-mono text-[#71717A]">
+                          ID: {member.discordUserId}
                         </div>
                       </div>
                       <span className="text-xs font-mono font-semibold text-white tabular-nums shrink-0">
@@ -493,29 +466,27 @@ export function CommunityPage({ guild, onToast }: CommunityPageProps) {
               )}
             </div>
 
-            <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-5 space-y-3">
-              <h3 className="text-xs font-mono uppercase tracking-wider text-[#A0A0A0]">
-                Recommendation Channel Activity
-              </h3>
+            <div className="bg-[#111111] border border-[#27272A] rounded-lg p-5 space-y-3">
+              <h3 className="text-xs font-semibold text-white">Channel Activity</h3>
               {recStats.channelActivity.length === 0 ? (
-                <p className="text-xs text-[#6E6E6E]">No channel activity recorded yet.</p>
+                <p className="text-xs text-[#71717A]">No channel activity recorded yet.</p>
               ) : (
                 <div className="space-y-2.5">
                   {recStats.channelActivity.map((ch: any) => (
                     <div
                       key={ch.channelId}
-                      className="flex items-center justify-between gap-2 border-b border-[#1E1E1E] pb-2 last:border-0 last:pb-0"
+                      className="flex items-center justify-between gap-2 border-b border-[#1E1E24] pb-2 last:border-0 last:pb-0"
                     >
                       <div className="min-w-0">
                         <div className="text-xs font-mono font-medium text-white truncate">
                           {resolveChannelName(ch.channelId)}
                         </div>
-                        <div className="text-[11px] font-mono text-[#6E6E6E]">
-                          Channel ID: {ch.channelId}
+                        <div className="text-[11px] font-mono text-[#71717A]">
+                          ID: {ch.channelId}
                         </div>
                       </div>
                       <span className="text-xs font-mono font-semibold text-white tabular-nums shrink-0">
-                        {ch.count} message{ch.count === 1 ? '' : 's'}
+                        {ch.count}
                       </span>
                     </div>
                   ))}
@@ -524,27 +495,25 @@ export function CommunityPage({ guild, onToast }: CommunityPageProps) {
             </div>
           </div>
 
-          {/* Recent Community Recommendations Table */}
-          <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-mono uppercase tracking-wider text-[#A0A0A0]">
-                Recent Public Recommendations
-              </h3>
-              <span className="text-xs font-mono text-[#6E6E6E] tabular-nums">
+          {/* Recent Recommendations Table */}
+          <div className="bg-[#111114] border border-[#27272A] rounded-lg p-5 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-[#27272A]">
+              <h3 className="text-xs font-semibold text-white">Recent Public Recommendations</h3>
+              <span className="text-xs font-mono text-[#71717A] tabular-nums">
                 Showing {recStats.recentRecommendations.length} of {recStats.totalRecommendations}
               </span>
             </div>
 
             {recStats.recentRecommendations.length === 0 ? (
-              <p className="text-xs text-[#6E6E6E]">
-                No public recommendations have been posted in this server yet. Run{' '}
-                <code className="text-white">/anime recommendation anime_name: Frieren</code> in Discord.
+              <p className="text-xs text-[#71717A]">
+                No public recommendations posted yet. Run{' '}
+                <code className="text-white">/anime recommendation</code> in Discord.
               </p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="border-b border-[#222222] text-[11px] font-mono uppercase text-[#6E6E6E]">
+                    <tr className="border-b border-[#27272A] text-[#71717A] font-medium">
                       <th className="py-2 pr-4">Anime Title</th>
                       <th className="py-2 px-4">Hoshika ID</th>
                       <th className="py-2 px-4">Recommended By</th>
@@ -553,22 +522,20 @@ export function CommunityPage({ guild, onToast }: CommunityPageProps) {
                       <th className="py-2 pl-4 text-right">AniScroll Link</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#1C1C1C] text-xs">
+                  <tbody className="divide-y divide-[#1E1E24]">
                     {recStats.recentRecommendations.map((rec: any) => (
-                      <tr key={rec.id} className="hover:bg-[#161616]">
-                        <td className="py-2.5 pr-4 font-medium text-white">
-                          {rec.animeTitle}
-                        </td>
-                        <td className="py-2.5 px-4 font-mono text-[#A0A0A0] tabular-nums">
+                      <tr key={rec.id} className="hover:bg-[#18181C]/60">
+                        <td className="py-2.5 pr-4 font-medium text-white">{rec.animeTitle}</td>
+                        <td className="py-2.5 px-4 font-mono text-[#A1A1AA] tabular-nums">
                           #{rec.hoshikaShortId}
                         </td>
-                        <td className="py-2.5 px-4 font-mono text-[#A0A0A0]">
+                        <td className="py-2.5 px-4 font-mono text-[#A1A1AA]">
                           @{rec.username || rec.discordUserId}
                         </td>
-                        <td className="py-2.5 px-4 font-mono text-[#A0A0A0]">
+                        <td className="py-2.5 px-4 font-mono text-[#A1A1AA]">
                           {resolveChannelName(rec.channelId)}
                         </td>
-                        <td className="py-2.5 px-4 font-mono text-[#6E6E6E] tabular-nums">
+                        <td className="py-2.5 px-4 font-mono text-[#71717A] tabular-nums">
                           {String(rec.createdAt).slice(0, 16).replace('T', ' ')} UTC
                         </td>
                         <td className="py-2.5 pl-4 text-right font-mono">
@@ -577,12 +544,12 @@ export function CommunityPage({ guild, onToast }: CommunityPageProps) {
                               href={rec.aniscrollUrl}
                               target="_blank"
                               rel="noreferrer"
-                              className="text-white underline hover:text-[#CCCCCC]"
+                              className="text-white underline hover:text-[#E4E4E7]"
                             >
                               Open AniScroll
                             </a>
                           ) : (
-                            <span className="text-[#6E6E6E]">—</span>
+                            <span className="text-[#71717A]">—</span>
                           )}
                         </td>
                       </tr>
@@ -596,8 +563,11 @@ export function CommunityPage({ guild, onToast }: CommunityPageProps) {
       )}
 
       {tab === 'welcome' && (
-        <form onSubmit={saveWelcome} className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-5 space-y-4">
-          <div className="flex items-center justify-between">
+        <form
+          onSubmit={saveWelcome}
+          className="bg-[#111114] border border-[#27272A] rounded-lg p-5 space-y-4"
+        >
+          <div className="flex items-center justify-between pb-3 border-b border-[#27272A]">
             <h2 className="text-sm font-semibold text-white">Welcome &amp; Farewell System</h2>
             <label className="inline-flex items-center gap-2 text-xs cursor-pointer">
               <input
@@ -612,23 +582,27 @@ export function CommunityPage({ guild, onToast }: CommunityPageProps) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="welcome-ch" className="block text-xs text-[#A0A0A0] mb-1">
+              <label htmlFor="welcome-ch" className="block text-xs text-[#A1A1AA] mb-1">
                 Welcome Channel
               </label>
               <select
                 id="welcome-ch"
                 value={welcome.channelId || ''}
                 onChange={(e) => setWelcome({ ...welcome, channelId: e.target.value || null })}
-                className="w-full bg-[#181818] border border-[#2A2A2A] rounded-md px-3 py-2 text-sm text-white"
+                className="w-full bg-[#18181C] border border-[#27272A] rounded-md px-3 py-2 text-sm text-white"
               >
                 <option value="">Select channel...</option>
-                {guild.channels.filter((c) => c.type === 'text').map((c) => (
-                  <option key={c.id} value={c.id}>#{c.name}</option>
-                ))}
+                {guild.channels
+                  .filter((c) => c.type === 'text')
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      #{c.name}
+                    </option>
+                  ))}
               </select>
             </div>
             <div>
-              <label htmlFor="welcome-title" className="block text-xs text-[#A0A0A0] mb-1">
+              <label htmlFor="welcome-title" className="block text-xs text-[#A1A1AA] mb-1">
                 Embed Title
               </label>
               <input
@@ -636,25 +610,29 @@ export function CommunityPage({ guild, onToast }: CommunityPageProps) {
                 type="text"
                 value={welcome.embedTitle}
                 onChange={(e) => setWelcome({ ...welcome, embedTitle: e.target.value })}
-                className="w-full bg-[#181818] border border-[#2A2A2A] rounded-md px-3 py-2 text-sm text-white"
+                className="w-full bg-[#18181C] border border-[#27272A] rounded-md px-3 py-2 text-sm text-white font-mono"
               />
             </div>
           </div>
 
           <div>
-            <label htmlFor="welcome-msg" className="block text-xs text-[#A0A0A0] mb-1">
-              Message Template (supports {'{user}'}, {'{username}'}, {'{server}'}, {'{memberCount}'})
+            <label htmlFor="welcome-msg" className="block text-xs text-[#A1A1AA] mb-1">
+              Message Template (supports {'{user}'}, {'{username}'}, {'{server}'},{' '}
+              {'{memberCount}'})
             </label>
             <textarea
               id="welcome-msg"
               rows={2}
               value={welcome.messageTemplate}
               onChange={(e) => setWelcome({ ...welcome, messageTemplate: e.target.value })}
-              className="w-full bg-[#181818] border border-[#2A2A2A] rounded-md px-3 py-2 text-sm text-white"
+              className="w-full bg-[#18181C] border border-[#27272A] rounded-md px-3 py-2 text-sm text-white font-mono"
             />
           </div>
 
-          <button type="submit" className="px-4 py-2 text-xs font-semibold bg-white text-black rounded-md hover:bg-[#E5E5E5]">
+          <button
+            type="submit"
+            className="px-4 py-2 text-xs font-semibold bg-white text-black rounded-md hover:bg-[#E4E4E7]"
+          >
             Save Welcome Settings
           </button>
         </form>
@@ -662,41 +640,53 @@ export function CommunityPage({ guild, onToast }: CommunityPageProps) {
 
       {tab === 'roles' && (
         <div className="space-y-4">
-          <form onSubmit={createPanel} className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-5 flex flex-wrap items-end gap-3">
+          <form
+            onSubmit={createPanel}
+            className="bg-[#111114] border border-[#27272A] rounded-lg p-5 flex flex-wrap items-end gap-3"
+          >
             <div className="flex-1 min-w-[200px]">
-              <label htmlFor="rr-title" className="block text-xs text-[#A0A0A0] mb-1">Panel Title</label>
+              <label htmlFor="rr-title" className="block text-xs text-[#A1A1AA] mb-1">
+                Panel Title
+              </label>
               <input
                 id="rr-title"
                 type="text"
                 value={panelTitle}
                 onChange={(e) => setPanelTitle(e.target.value)}
                 placeholder="e.g. Genre Opt-In Roles"
-                className="w-full bg-[#181818] border border-[#2A2A2A] rounded-md px-3 py-2 text-sm text-white"
+                className="w-full bg-[#18181C] border border-[#27272A] rounded-md px-3 py-2 text-sm text-white"
               />
             </div>
             <div>
-              <label htmlFor="rr-role" className="block text-xs text-[#A0A0A0] mb-1">Role</label>
+              <label htmlFor="rr-role" className="block text-xs text-[#A1A1AA] mb-1">
+                Role
+              </label>
               <select
                 id="rr-role"
                 value={panelRoleId}
                 onChange={(e) => setPanelRoleId(e.target.value)}
-                className="bg-[#181818] border border-[#2A2A2A] rounded-md px-3 py-2 text-sm text-white"
+                className="bg-[#18181C] border border-[#27272A] rounded-md px-3 py-2 text-sm text-white"
               >
                 {guild.roles.map((r) => (
-                  <option key={r.id} value={r.id}>{r.name}</option>
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
                 ))}
               </select>
             </div>
-            <button type="submit" className="px-4 py-2 text-xs font-semibold bg-white text-black rounded-md">
+            <button
+              type="submit"
+              className="px-4 py-2 text-xs font-semibold bg-white text-black rounded-md hover:bg-[#E4E4E7]"
+            >
               Create Role Panel
             </button>
           </form>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {community.reactionRoles.map((p: any) => (
-              <div key={p.id} className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-5">
+              <div key={p.id} className="bg-[#111114] border border-[#27272A] rounded-lg p-5">
                 <div className="text-sm font-semibold text-white">{p.title}</div>
-                <div className="mt-1 text-xs text-[#A0A0A0] font-mono">
+                <div className="mt-1 text-xs text-[#A1A1AA] font-mono">
                   Mode: {p.mode} · Roles: {p.roles.map((r: any) => r.label).join(', ')}
                 </div>
               </div>
@@ -707,36 +697,57 @@ export function CommunityPage({ guild, onToast }: CommunityPageProps) {
 
       {tab === 'suggestions' && (
         <div className="space-y-4">
-          <form onSubmit={createSuggestion} className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-5 flex gap-3">
+          <form
+            onSubmit={createSuggestion}
+            className="bg-[#111114] border border-[#27272A] rounded-lg p-5 flex gap-3"
+          >
             <input
               type="text"
               value={newSuggestion}
               onChange={(e) => setNewSuggestion(e.target.value)}
               placeholder="Submit a new community suggestion..."
-              className="flex-1 bg-[#181818] border border-[#2A2A2A] rounded-md px-3 py-2 text-sm text-white"
+              className="flex-1 bg-[#18181C] border border-[#27272A] rounded-md px-3 py-2 text-sm text-white"
             />
-            <button type="submit" className="px-4 py-2 text-xs font-semibold bg-white text-black rounded-md whitespace-nowrap">
+            <button
+              type="submit"
+              className="px-4 py-2 text-xs font-semibold bg-white text-black rounded-md hover:bg-[#E4E4E7] whitespace-nowrap"
+            >
               Submit Suggestion
             </button>
           </form>
 
           <div className="space-y-3">
             {community.suggestions.map((s: any) => (
-              <div key={s.id} className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div
+                key={s.id}
+                className="bg-[#111114] border border-[#27272A] rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+              >
                 <div>
                   <div className="text-sm text-white">{s.content}</div>
-                  <div className="mt-1 text-xs text-[#A0A0A0] font-mono tabular-nums">
+                  <div className="mt-1 text-xs text-[#A1A1AA] font-mono tabular-nums">
                     Status: {s.status} · Upvotes: {s.upvotes} · Downvotes: {s.downvotes}
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 shrink-0">
-                  <button type="button" onClick={() => voteSuggestion(s.id, 'up')} className="px-2.5 py-1 text-xs border border-[#2A2A2A] rounded hover:border-white">
+                  <button
+                    type="button"
+                    onClick={() => voteSuggestion(s.id, 'up')}
+                    className="px-2.5 py-1 text-xs border border-[#27272A] rounded hover:border-white/70"
+                  >
                     Upvote
                   </button>
-                  <button type="button" onClick={() => updateSuggestionStatus(s.id, 'APPROVED')} className="px-2.5 py-1 text-xs border border-[#2A2A2A] rounded hover:border-white">
+                  <button
+                    type="button"
+                    onClick={() => updateSuggestionStatus(s.id, 'APPROVED')}
+                    className="px-2.5 py-1 text-xs border border-[#27272A] rounded hover:border-white/70"
+                  >
                     Approve
                   </button>
-                  <button type="button" onClick={() => updateSuggestionStatus(s.id, 'IMPLEMENTED')} className="px-2.5 py-1 text-xs bg-white text-black rounded">
+                  <button
+                    type="button"
+                    onClick={() => updateSuggestionStatus(s.id, 'IMPLEMENTED')}
+                    className="px-2.5 py-1 text-xs bg-white text-black rounded font-medium"
+                  >
                     Implemented
                   </button>
                 </div>
@@ -748,40 +759,61 @@ export function CommunityPage({ guild, onToast }: CommunityPageProps) {
 
       {tab === 'tickets' && (
         <div className="space-y-4">
-          <form onSubmit={createTicket} className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-5 flex gap-3">
+          <form
+            onSubmit={createTicket}
+            className="bg-[#111114] border border-[#27272A] rounded-lg p-5 flex gap-3"
+          >
             <input
               type="text"
               value={newTicketSubject}
               onChange={(e) => setNewTicketSubject(e.target.value)}
               placeholder="Ticket subject..."
-              className="flex-1 bg-[#181818] border border-[#2A2A2A] rounded-md px-3 py-2 text-sm text-white"
+              className="flex-1 bg-[#18181C] border border-[#27272A] rounded-md px-3 py-2 text-sm text-white"
             />
-            <button type="submit" className="px-4 py-2 text-xs font-semibold bg-white text-black rounded-md whitespace-nowrap">
+            <button
+              type="submit"
+              className="px-4 py-2 text-xs font-semibold bg-white text-black rounded-md hover:bg-[#E4E4E7] whitespace-nowrap"
+            >
               Open Ticket
             </button>
           </form>
 
           <div className="space-y-3">
             {community.tickets.map((t: any) => (
-              <div key={t.id} className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div
+                key={t.id}
+                className="bg-[#111114] border border-[#27272A] rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+              >
                 <div>
                   <div className="text-sm font-medium text-white">{t.subject || 'Support Ticket'}</div>
-                  <div className="text-xs text-[#A0A0A0] font-mono mt-0.5">
+                  <div className="text-xs text-[#A1A1AA] font-mono mt-0.5">
                     {t.category} · Status: {t.status} · User {t.userId}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {t.status !== 'CLOSED' ? (
                     <>
-                      <button type="button" onClick={() => updateTicket(t.id, 'CLAIMED')} className="px-2.5 py-1 text-xs border border-[#2A2A2A] rounded hover:border-white">
+                      <button
+                        type="button"
+                        onClick={() => updateTicket(t.id, 'CLAIMED')}
+                        className="px-2.5 py-1 text-xs border border-[#27272A] rounded hover:border-white/70"
+                      >
                         Claim
                       </button>
-                      <button type="button" onClick={() => updateTicket(t.id, 'CLOSED')} className="px-2.5 py-1 text-xs bg-white text-black rounded">
+                      <button
+                        type="button"
+                        onClick={() => updateTicket(t.id, 'CLOSED')}
+                        className="px-2.5 py-1 text-xs bg-white text-black rounded font-medium"
+                      >
                         Close
                       </button>
                     </>
                   ) : (
-                    <button type="button" onClick={() => updateTicket(t.id, 'OPEN')} className="px-2.5 py-1 text-xs border border-[#2A2A2A] rounded hover:border-white">
+                    <button
+                      type="button"
+                      onClick={() => updateTicket(t.id, 'OPEN')}
+                      className="px-2.5 py-1 text-xs border border-[#27272A] rounded hover:border-white/70"
+                    >
                       Reopen
                     </button>
                   )}
@@ -795,58 +827,77 @@ export function CommunityPage({ guild, onToast }: CommunityPageProps) {
       {tab === 'polls' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="space-y-4">
-            <form onSubmit={createPoll} className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-5 space-y-3">
+            <form
+              onSubmit={createPoll}
+              className="bg-[#111114] border border-[#27272A] rounded-lg p-5 space-y-3"
+            >
               <h2 className="text-sm font-semibold text-white">Create Poll</h2>
               <input
                 type="text"
                 value={newPollQuestion}
                 onChange={(e) => setNewPollQuestion(e.target.value)}
                 placeholder="Poll question..."
-                className="w-full bg-[#181818] border border-[#2A2A2A] rounded-md px-3 py-2 text-sm text-white"
+                className="w-full bg-[#18181C] border border-[#27272A] rounded-md px-3 py-2 text-sm text-white"
               />
               <input
                 type="text"
                 value={newPollOptions}
                 onChange={(e) => setNewPollOptions(e.target.value)}
                 placeholder="Comma-separated options"
-                className="w-full bg-[#181818] border border-[#2A2A2A] rounded-md px-3 py-2 text-sm text-white"
+                className="w-full bg-[#18181C] border border-[#27272A] rounded-md px-3 py-2 text-sm text-white"
               />
-              <button type="submit" className="px-4 py-2 text-xs font-semibold bg-white text-black rounded-md">
+              <button
+                type="submit"
+                className="px-4 py-2 text-xs font-semibold bg-white text-black rounded-md hover:bg-[#E4E4E7]"
+              >
                 Launch Poll
               </button>
             </form>
             {community.polls.map((p: any) => (
-              <div key={p.id} className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-4">
+              <div key={p.id} className="bg-[#111114] border border-[#27272A] rounded-lg p-4">
                 <div className="text-sm font-medium text-white">{p.question}</div>
-                <div className="mt-1 text-xs text-[#A0A0A0]">{p.options.join(' · ')}</div>
+                <div className="mt-1 text-xs text-[#A1A1AA]">{p.options.join(' · ')}</div>
               </div>
             ))}
           </div>
 
           <div className="space-y-4">
-            <form onSubmit={createGiveaway} className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-5 space-y-3">
+            <form
+              onSubmit={createGiveaway}
+              className="bg-[#111114] border border-[#27272A] rounded-lg p-5 space-y-3"
+            >
               <h2 className="text-sm font-semibold text-white">Start Giveaway</h2>
               <input
                 type="text"
                 value={newGiveawayPrize}
                 onChange={(e) => setNewGiveawayPrize(e.target.value)}
                 placeholder="Giveaway prize..."
-                className="w-full bg-[#181818] border border-[#2A2A2A] rounded-md px-3 py-2 text-sm text-white"
+                className="w-full bg-[#18181C] border border-[#27272A] rounded-md px-3 py-2 text-sm text-white"
               />
-              <button type="submit" className="px-4 py-2 text-xs font-semibold bg-white text-black rounded-md">
+              <button
+                type="submit"
+                className="px-4 py-2 text-xs font-semibold bg-white text-black rounded-md hover:bg-[#E4E4E7]"
+              >
                 Start Giveaway
               </button>
             </form>
             {community.giveaways.map((g: any) => (
-              <div key={g.id} className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-4 flex items-center justify-between gap-3">
+              <div
+                key={g.id}
+                className="bg-[#111114] border border-[#27272A] rounded-lg p-4 flex items-center justify-between gap-3"
+              >
                 <div>
                   <div className="text-sm font-medium text-white">{g.prize}</div>
-                  <div className="text-xs text-[#A0A0A0] font-mono mt-0.5">
+                  <div className="text-xs text-[#A1A1AA] font-mono mt-0.5">
                     {g.ended ? `Ended · Winners: ${g.winnerIds.length}` : `Active · ${g.winnerCount} winner(s)`}
                   </div>
                 </div>
                 {!g.ended && (
-                  <button type="button" onClick={() => drawGiveaway(g.id)} className="px-3 py-1.5 text-xs border border-[#2A2A2A] rounded hover:border-white">
+                  <button
+                    type="button"
+                    onClick={() => drawGiveaway(g.id)}
+                    className="px-3 py-1.5 text-xs border border-[#27272A] rounded hover:border-white/70"
+                  >
                     Draw Now
                   </button>
                 )}

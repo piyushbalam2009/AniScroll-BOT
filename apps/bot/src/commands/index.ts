@@ -9,6 +9,7 @@ import { watchlistCommand } from './watchlist/watchlist';
 import { musicCommands } from './music/music';
 import { moderationCommands } from './moderation/moderation';
 import { communityCommands } from './community/community';
+import { rulesCommand } from './community/rules';
 
 export function buildCommandRegistry(): Map<string, BotSlashCommand> {
   const all: BotSlashCommand[] = [
@@ -22,6 +23,7 @@ export function buildCommandRegistry(): Map<string, BotSlashCommand> {
     ...musicCommands,
     ...moderationCommands,
     ...communityCommands,
+    rulesCommand,
   ];
   const map = new Map<string, BotSlashCommand>();
   for (const cmd of all) {

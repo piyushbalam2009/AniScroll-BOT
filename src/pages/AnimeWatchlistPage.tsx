@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Download, ExternalLink, Info, Plus, Search, Trash2, X } from 'lucide-react';
 import { apiRequest } from '../lib/api';
 import { buildAniScrollAnimeUrl } from '../../packages/shared/src/animeUrl';
+import { filterAndSortWatchlist, WatchlistSortKey } from '../lib/dashboardUtils';
 
 interface AnimeWatchlistPageProps {
   guildId: string;
@@ -28,8 +29,12 @@ export function AnimeWatchlistPage({ guildId, onToast }: AnimeWatchlistPageProps
   const [watchlist, setWatchlist] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [statusFilter, setStatusFilter] = useState('');
+  const [watchlistSearch, setWatchlistSearch] = useState('');
+  const [watchlistSort, setWatchlistSort] = useState<WatchlistSortKey>('updated');
+
   const [animeStatusInfo, setAnimeStatusInfo] = useState<any>(null);
   const [animeConfig, setAnimeConfig] = useState<any>(null);
+  const [brokenPosters, setBrokenPosters] = useState<Record<string, boolean>>({});
 
   const loadWatchlist = useCallback(async () => {
     const qs = statusFilter ? `?status=${statusFilter}` : '';
@@ -134,25 +139,38 @@ export function AnimeWatchlistPage({ guildId, onToast }: AnimeWatchlistPageProps
     onToast('Anime command configuration saved.');
   };
 
+  const renderPoster = (src: string | undefined, alt: string, keyId: string, sizeClass: string) => {
+    if (!src || brokenPosters[keyId]) {
+      return (
+        <div
+          className={`${sizeClass} bg-[#1E1E24] border border-[#27272A] rounded flex items-center justify-center text-[11px] font-mono text-[#71717A] shrink-0`}
+        >
+          {alt.slice(0, 2).toUpperCase()}
+        </div>
+      );
+    }
+    return (
+      <img
+        src={src}
+        alt={alt}
+        referrerPolicy="no-referrer"
+        onError={() => setBrokenPosters((prev) => ({ ...prev, [keyId]: true }))}
+        className={`${sizeClass} object-cover rounded bg-[#1E1E24] shrink-0`}
+      />
+    );
+  };
+
   const renderAnimeCard = (anime: any, keyPrefix: string) => {
     const title = anime.titleEnglish || anime.titleRomaji || anime.title || 'Untitled';
     const aniscrollUrl = anime.aniscrollUrl || buildAniScrollAnimeUrl(anime.shortId);
     const hasShortId = Boolean(anime.shortId && anime.shortId > 0);
+    const keyId = `${keyPrefix}-${anime.hoshikaId || anime.shortId || title}`;
     return (
       <div
-        key={`${keyPrefix}-${anime.hoshikaId || anime.shortId || title}`}
-        className="bg-[#181818] border border-[#2A2A2A] rounded-md p-3.5 flex gap-3"
+        key={keyId}
+        className="bg-[#18181C] border border-[#27272A] rounded-md p-3.5 flex gap-3 hover:border-[#3F3F46] transition-colors"
       >
-        {anime.poster ? (
-          <img
-            src={anime.poster}
-            alt={title}
-            referrerPolicy="no-referrer"
-            className="w-16 h-24 object-cover rounded bg-[#222222] shrink-0"
-          />
-        ) : (
-          <div className="w-16 h-24 bg-[#222222] rounded shrink-0" />
-        )}
+        {renderPoster(anime.poster, title, keyId, 'w-16 h-24')}
         <div className="min-w-0 flex-1 flex flex-col justify-between gap-2">
           <div>
             {aniscrollUrl ? (
@@ -167,8 +185,8 @@ export function AnimeWatchlistPage({ guildId, onToast }: AnimeWatchlistPageProps
             ) : (
               <h3 className="text-sm font-medium text-white truncate">{title}</h3>
             )}
-            <div className="text-xs text-[#A0A0A0] font-mono tabular-nums mt-0.5">
-              {anime.type || 'TV'} · {hasShortId ? `#${anime.shortId}` : 'Hoshika ID unavailable'}
+            <div className="text-xs text-[#A1A1AA] font-mono tabular-nums mt-0.5">
+              {anime.type || 'TV'} · {hasShortId ? `#${anime.shortId}` : 'ID unavailable'}
               {anime.rating ? ` · ${anime.rating}/100` : ''}
             </div>
           </div>
@@ -179,21 +197,19 @@ export function AnimeWatchlistPage({ guildId, onToast }: AnimeWatchlistPageProps
                 href={aniscrollUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium bg-black border border-[#2A2A2A] text-white rounded hover:border-white"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium bg-[#111114] border border-[#27272A] text-white rounded hover:border-white/70"
               >
                 <span>Open</span>
-                <ExternalLink className="w-3 h-3 text-[#A0A0A0]" />
+                <ExternalLink className="w-3 h-3 text-[#A1A1AA]" />
               </a>
             ) : (
-              <span className="px-2 py-1 text-[11px] text-[#666666] border border-[#2A2A2A] rounded">
-                Link unavailable
-              </span>
+              <span className="px-2 py-1 text-[11px] text-[#71717A] font-mono">Link unavailable</span>
             )}
             {hasShortId && (
               <button
                 type="button"
                 onClick={() => handleInspectDetails(anime.shortId)}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium border border-[#2A2A2A] text-[#D4D4D4] rounded hover:border-white hover:text-white"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium border border-[#27272A] text-[#E4E4E7] rounded hover:border-white/70 hover:text-white"
               >
                 <Info className="w-3 h-3" />
                 <span>Details</span>
@@ -202,7 +218,7 @@ export function AnimeWatchlistPage({ guildId, onToast }: AnimeWatchlistPageProps
             <button
               type="button"
               onClick={() => handleAddWatchlist(anime)}
-              className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 text-xs font-medium bg-white text-black rounded hover:bg-[#E5E5E5]"
+              className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 text-xs font-semibold bg-white text-black rounded hover:bg-[#E4E4E7]"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Add</span>
@@ -217,44 +233,48 @@ export function AnimeWatchlistPage({ guildId, onToast }: AnimeWatchlistPageProps
     ? selectedAnime.aniscrollUrl || buildAniScrollAnimeUrl(selectedAnime.shortId)
     : null;
 
+  const visibleWatchlist = filterAndSortWatchlist(watchlist, watchlistSearch, watchlistSort);
+
   return (
     <div className="space-y-6">
       {/* Hoshika Status + Cache TTLs */}
       {animeStatusInfo && (
-        <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-5 flex flex-wrap items-center justify-between gap-4">
+        <div className="bg-[#111114] border border-[#27272A] rounded-lg p-5 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="text-sm font-semibold text-white">Hoshika Direct Integration</h2>
-            <p className="text-xs text-[#A0A0A0] font-mono mt-1">
+            <p className="text-xs text-[#A1A1AA] font-mono mt-1">
               Endpoint: {animeStatusInfo.hoshika.baseUrl} · Cache: {animeStatusInfo.cache.backend} · Links: Hoshika shortId
             </p>
           </div>
-          <div className="text-xs font-mono text-[#A0A0A0] tabular-nums">
+          <div className="text-xs font-mono text-[#A1A1AA] tabular-nums">
             Search TTL: {animeStatusInfo.ttls.search}s · Details TTL: {animeStatusInfo.ttls.details}s
           </div>
         </div>
       )}
 
       {/* Live Hoshika Search Test Tool */}
-      <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-5 space-y-4">
+      <div className="bg-[#111114] border border-[#27272A] rounded-lg p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-white">Live Hoshika Search Tool</h2>
-          <span className="text-[11px] font-mono text-[#A0A0A0]">aniscroll.in/anime/&#123;shortId&#125;</span>
+          <span className="text-xs font-mono text-[#71717A]">aniscroll.in/anime/&#123;shortId&#125;</span>
         </div>
 
         <form onSubmit={handleSearch} className="flex gap-2">
-          <label htmlFor="hoshika-search-input" className="sr-only">Search Hoshika anime</label>
+          <label htmlFor="hoshika-search-input" className="sr-only">
+            Search Hoshika anime
+          </label>
           <input
             id="hoshika-search-input"
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search live Hoshika catalog (e.g. Frieren, Naruto, Bleach)..."
-            className="flex-1 bg-[#181818] border border-[#2A2A2A] rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-white"
+            className="flex-1 bg-[#18181C] border border-[#27272A] rounded-md px-3 py-2 text-sm text-white placeholder:text-[#71717A] focus:outline-none focus:border-white/70"
           />
           <button
             type="submit"
             disabled={searching}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-white text-black rounded-md hover:bg-[#E5E5E5] disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-white text-black rounded-md hover:bg-[#E4E4E7] disabled:opacity-50 whitespace-nowrap"
           >
             <Search className="w-3.5 h-3.5" />
             <span>{searching ? 'Searching...' : 'Search Hoshika'}</span>
@@ -262,7 +282,10 @@ export function AnimeWatchlistPage({ guildId, onToast }: AnimeWatchlistPageProps
         </form>
 
         {results.length > 0 && (
-          <div data-testid="anime-search-results" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+          <div
+            data-testid="anime-search-results"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2"
+          >
             {results.map((anime) => renderAnimeCard(anime, 'search'))}
           </div>
         )}
@@ -270,34 +293,39 @@ export function AnimeWatchlistPage({ guildId, onToast }: AnimeWatchlistPageProps
 
       {/* Selected Anime Details, Relations & Recommendations */}
       {(loadingDetails || selectedAnime) && (
-        <div data-testid="anime-detail-panel" className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-5 space-y-5">
+        <div
+          data-testid="anime-detail-panel"
+          className="bg-[#111114] border border-[#27272A] rounded-lg p-5 space-y-5"
+        >
           {loadingDetails ? (
-            <div className="h-32 bg-[#181818] rounded animate-pulse" />
+            <div className="h-32 bg-[#18181C] rounded animate-pulse" />
           ) : (
             selectedAnime && (
               <>
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-4 min-w-0">
-                    {selectedAnime.poster && (
-                      <img
-                        src={selectedAnime.poster}
-                        alt={selectedAnime.titleEnglish || selectedAnime.titleRomaji}
-                        referrerPolicy="no-referrer"
-                        className="w-20 h-28 object-cover rounded bg-[#222222] shrink-0"
-                      />
+                    {renderPoster(
+                      selectedAnime.poster,
+                      selectedAnime.titleEnglish || selectedAnime.titleRomaji || 'Anime',
+                      `detail-${selectedAnime.shortId}`,
+                      'w-20 h-28'
                     )}
                     <div className="min-w-0 space-y-1.5">
                       <h2 className="text-base font-semibold text-white">
                         {selectedAnime.titleEnglish || selectedAnime.titleRomaji}
                       </h2>
-                      <div className="text-xs font-mono text-[#A0A0A0] tabular-nums">
+                      <div className="text-xs font-mono text-[#A1A1AA] tabular-nums">
                         {selectedAnime.type || 'TV'} ·{' '}
-                        {selectedAnime.shortId ? `Hoshika #${selectedAnime.shortId}` : 'Hoshika ID unavailable'}
+                        {selectedAnime.shortId
+                          ? `Hoshika #${selectedAnime.shortId}`
+                          : 'Hoshika ID unavailable'}
                         {selectedAnime.totalEpisodes ? ` · ${selectedAnime.totalEpisodes} ep` : ''}
                         {selectedAnime.rating ? ` · ${selectedAnime.rating}/100` : ''}
                       </div>
                       {selectedAnime.synopsis && (
-                        <p className="text-xs text-[#D4D4D4] line-clamp-3 max-w-3xl">{selectedAnime.synopsis}</p>
+                        <p className="text-xs text-[#D4D4D8] line-clamp-3 max-w-3xl">
+                          {selectedAnime.synopsis}
+                        </p>
                       )}
                       <div className="pt-1 flex flex-wrap items-center gap-2">
                         {selectedAniScrollUrl ? (
@@ -305,13 +333,15 @@ export function AnimeWatchlistPage({ guildId, onToast }: AnimeWatchlistPageProps
                             href={selectedAniScrollUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white text-black rounded hover:bg-[#E5E5E5]"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white text-black rounded hover:bg-[#E4E4E7]"
                           >
                             <span>Open on AniScroll</span>
                             <ExternalLink className="w-3.5 h-3.5" />
                           </a>
                         ) : (
-                          <span className="text-xs text-[#A0A0A0]">Hoshika ID unavailable — cannot generate AniScroll link</span>
+                          <span className="text-xs text-[#A1A1AA]">
+                            Hoshika ID unavailable — cannot generate AniScroll link
+                          </span>
                         )}
                       </div>
                     </div>
@@ -320,63 +350,56 @@ export function AnimeWatchlistPage({ guildId, onToast }: AnimeWatchlistPageProps
                     type="button"
                     aria-label="Close anime details"
                     onClick={() => setSelectedAnime(null)}
-                    className="p-1.5 border border-[#2A2A2A] rounded text-[#A0A0A0] hover:text-white"
+                    className="p-1.5 border border-[#27272A] rounded text-[#A1A1AA] hover:text-white"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                {Array.isArray(selectedAnime.recommendations) && selectedAnime.recommendations.length > 0 && (
-                  <div className="space-y-2.5 pt-3 border-t border-[#2A2A2A]">
-                    <h3 className="text-xs font-semibold text-white uppercase tracking-wider">
-                      Recommendations
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                      {selectedAnime.recommendations.slice(0, 8).map((rec: any) => {
-                        const recUrl = rec.aniscrollUrl || buildAniScrollAnimeUrl(rec.shortId);
-                        return (
-                          <div
-                            key={`${rec.shortId ?? rec.title}`}
-                            className="bg-[#181818] border border-[#2A2A2A] rounded-md p-3 flex items-center gap-2.5"
-                          >
-                            {rec.coverImage ? (
-                              <img
-                                src={rec.coverImage}
-                                alt={rec.title}
-                                referrerPolicy="no-referrer"
-                                className="w-10 h-14 object-cover rounded bg-[#222222] shrink-0"
-                              />
-                            ) : (
-                              <div className="w-10 h-14 bg-[#222222] rounded shrink-0" />
-                            )}
-                            <div className="min-w-0 flex-1">
-                              {recUrl ? (
-                                <a
-                                  href={recUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-xs font-medium text-white hover:underline truncate block"
-                                >
-                                  {rec.title}
-                                </a>
-                              ) : (
-                                <div className="text-xs font-medium text-white truncate">{rec.title}</div>
-                              )}
-                              <div className="text-[11px] text-[#A0A0A0] font-mono tabular-nums mt-0.5">
-                                {rec.shortId ? `#${rec.shortId}` : 'ID missing'}
-                                {rec.averageScore ? ` · ${rec.averageScore}/100` : ''}
+                {Array.isArray(selectedAnime.recommendations) &&
+                  selectedAnime.recommendations.length > 0 && (
+                    <div className="space-y-2.5 pt-4 border-t border-[#27272A]">
+                      <h3 className="text-xs font-semibold text-white">Similar Recommendations</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        {selectedAnime.recommendations.slice(0, 8).map((rec: any) => {
+                          const recUrl = rec.aniscrollUrl || buildAniScrollAnimeUrl(rec.shortId);
+                          const recKey = `rec-${rec.shortId ?? rec.title}`;
+                          return (
+                            <div
+                              key={recKey}
+                              className="bg-[#18181C] border border-[#27272A] rounded-md p-3 flex items-center gap-2.5"
+                            >
+                              {renderPoster(rec.coverImage, rec.title || 'Rec', recKey, 'w-10 h-14')}
+                              <div className="min-w-0 flex-1">
+                                {recUrl ? (
+                                  <a
+                                    href={recUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-xs font-medium text-white hover:underline truncate block"
+                                  >
+                                    {rec.title}
+                                  </a>
+                                ) : (
+                                  <div className="text-xs font-medium text-white truncate">
+                                    {rec.title}
+                                  </div>
+                                )}
+                                <div className="text-[11px] text-[#A1A1AA] font-mono tabular-nums mt-0.5">
+                                  {rec.shortId ? `#${rec.shortId}` : 'ID missing'}
+                                  {rec.averageScore ? ` · ${rec.averageScore}/100` : ''}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                 {Array.isArray(selectedAnime.relations) && selectedAnime.relations.length > 0 && (
-                  <div className="space-y-2.5 pt-3 border-t border-[#2A2A2A]">
-                    <h3 className="text-xs font-semibold text-white uppercase tracking-wider">Related Titles</h3>
+                  <div className="space-y-2.5 pt-4 border-t border-[#27272A]">
+                    <h3 className="text-xs font-semibold text-white">Related Titles</h3>
                     <div className="flex flex-wrap gap-2">
                       {selectedAnime.relations.slice(0, 8).map((rel: any) => {
                         const relUrl = rel.aniscrollUrl || buildAniScrollAnimeUrl(rel.shortId);
@@ -386,16 +409,16 @@ export function AnimeWatchlistPage({ guildId, onToast }: AnimeWatchlistPageProps
                             href={relUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#181818] border border-[#2A2A2A] rounded hover:border-white text-white"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#18181C] border border-[#27272A] rounded hover:border-white/70 text-white"
                           >
-                            <span className="text-[#A0A0A0] font-mono">{rel.relationType}</span>
+                            <span className="text-[#A1A1AA] font-mono">{rel.relationType}</span>
                             <span>{rel.title}</span>
-                            <ExternalLink className="w-3 h-3 text-[#A0A0A0]" />
+                            <ExternalLink className="w-3 h-3 text-[#A1A1AA]" />
                           </a>
                         ) : (
                           <span
                             key={`${rel.relationType}-${rel.title}`}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-[#181818] border border-[#2A2A2A] rounded text-[#A0A0A0]"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-[#A1A1AA]"
                           >
                             <span className="font-mono">{rel.relationType}</span>
                             <span>{rel.title}</span>
@@ -413,45 +436,79 @@ export function AnimeWatchlistPage({ guildId, onToast }: AnimeWatchlistPageProps
 
       {/* Trending Anime Discovery */}
       {trending.length > 0 && (
-        <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-5 space-y-4">
+        <div className="bg-[#111114] border border-[#27272A] rounded-lg p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-white">Trending on Hoshika</h2>
-            <span className="text-[11px] font-mono text-[#A0A0A0]">Top {Math.min(6, trending.length)} titles</span>
+            <span className="text-xs font-mono text-[#71717A] tabular-nums">
+              Top {Math.min(6, trending.length)} titles
+            </span>
           </div>
-          <div data-testid="anime-trending-results" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div
+            data-testid="anime-trending-results"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+          >
             {trending.slice(0, 6).map((anime) => renderAnimeCard(anime, 'trending'))}
           </div>
         </div>
       )}
 
       {/* Personal Watchlist Table */}
-      <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-5 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-[#111114] border border-[#27272A] rounded-lg p-5 space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-[#27272A]">
           <div>
             <h2 className="text-sm font-semibold text-white">
               Personal Watchlist ({stats?.totalEntries ?? watchlist.length})
             </h2>
             {stats && (
-              <p className="text-xs text-[#A0A0A0] font-mono tabular-nums mt-0.5">
-                Episodes Watched: {stats.totalEpisodesWatched} · Avg Rating: {stats.averageRating ?? 'N/A'}
+              <p className="text-xs text-[#A1A1AA] font-mono tabular-nums mt-0.5">
+                Episodes Watched: {stats.totalEpisodesWatched} · Avg Rating:{' '}
+                {stats.averageRating ?? 'N/A'}
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative w-full sm:w-48">
+              <Search className="w-3.5 h-3.5 text-[#71717A] absolute left-2.5 top-2 pointer-events-none" />
+              <input
+                type="text"
+                aria-label="Filter watchlist by title or ID"
+                value={watchlistSearch}
+                onChange={(e) => setWatchlistSearch(e.target.value)}
+                placeholder="Filter title or #ID..."
+                className="w-full bg-[#18181C] border border-[#27272A] rounded-md pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-[#71717A] focus:outline-none focus:border-white/70"
+              />
+            </div>
+
             <select
               aria-label="Filter watchlist by status"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-[#181818] border border-[#2A2A2A] rounded-md px-3 py-1.5 text-xs text-white"
+              className="bg-[#18181C] border border-[#27272A] rounded-md px-3 py-1.5 text-xs text-white"
             >
               <option value="">All Statuses</option>
               {WATCH_STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
               ))}
             </select>
+
+            <select
+              aria-label="Sort watchlist"
+              value={watchlistSort}
+              onChange={(e) => setWatchlistSort(e.target.value as WatchlistSortKey)}
+              className="bg-[#18181C] border border-[#27272A] rounded-md px-3 py-1.5 text-xs text-white"
+            >
+              <option value="updated">Sort: Recently Updated</option>
+              <option value="title">Sort: Title A–Z</option>
+              <option value="progress">Sort: Episodes Watched</option>
+              <option value="rating">Sort: Personal Rating</option>
+            </select>
+
             <a
               href="/api/v1/watchlist/export"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-[#2A2A2A] rounded-md text-[#A0A0A0] hover:text-white"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-[#27272A] rounded-md text-[#A1A1AA] hover:text-white hover:border-white/60"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Export JSON</span>
@@ -459,13 +516,17 @@ export function AnimeWatchlistPage({ guildId, onToast }: AnimeWatchlistPageProps
           </div>
         </div>
 
-        {watchlist.length === 0 ? (
-          <p className="text-sm text-[#A0A0A0]">Your watchlist is empty. Search Hoshika above to add anime.</p>
+        {visibleWatchlist.length === 0 ? (
+          <p className="text-sm text-[#A1A1AA]">
+            {watchlist.length === 0
+              ? 'Your watchlist is empty. Search Hoshika above to add anime.'
+              : 'No watchlist entries match your title filter.'}
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-sm">
               <thead>
-                <tr className="border-b border-[#2A2A2A] text-xs text-[#A0A0A0]">
+                <tr className="border-b border-[#27272A] text-xs text-[#71717A]">
                   <th className="py-2 pr-4 font-medium">Title</th>
                   <th className="py-2 pr-4 font-medium">Status</th>
                   <th className="py-2 pr-4 font-medium">Progress</th>
@@ -473,11 +534,12 @@ export function AnimeWatchlistPage({ guildId, onToast }: AnimeWatchlistPageProps
                   <th className="py-2 text-right font-medium">Remove</th>
                 </tr>
               </thead>
-              <tbody>
-                {watchlist.map((item) => {
-                  const itemUrl = item.aniscrollUrl || buildAniScrollAnimeUrl(item.hoshikaShortId);
+              <tbody className="divide-y divide-[#1E1E24]">
+                {visibleWatchlist.map((item) => {
+                  const itemUrl =
+                    item.aniscrollUrl || buildAniScrollAnimeUrl(item.hoshikaShortId);
                   return (
-                    <tr key={item.id} className="border-b border-[#1E1E1E] last:border-0">
+                    <tr key={item.id} className="hover:bg-[#18181C]/60">
                       <td className="py-3 pr-4 font-medium text-white">
                         {itemUrl ? (
                           <a
@@ -487,13 +549,15 @@ export function AnimeWatchlistPage({ guildId, onToast }: AnimeWatchlistPageProps
                             className="inline-flex items-center gap-1.5 hover:underline"
                           >
                             <span>{item.titleSnapshot}</span>
-                            <ExternalLink className="w-3 h-3 text-[#A0A0A0]" />
+                            <ExternalLink className="w-3 h-3 text-[#A1A1AA]" />
                           </a>
                         ) : (
                           <span>{item.titleSnapshot}</span>
                         )}
-                        <div className="text-[11px] text-[#A0A0A0] font-mono tabular-nums">
-                          {item.hoshikaShortId ? `Hoshika #${item.hoshikaShortId}` : 'Hoshika ID unavailable'}
+                        <div className="text-[11px] text-[#71717A] font-mono tabular-nums">
+                          {item.hoshikaShortId
+                            ? `Hoshika #${item.hoshikaShortId}`
+                            : 'Hoshika ID unavailable'}
                         </div>
                       </td>
                       <td className="py-3 pr-4">
@@ -501,20 +565,28 @@ export function AnimeWatchlistPage({ guildId, onToast }: AnimeWatchlistPageProps
                           aria-label={`Status for ${item.titleSnapshot}`}
                           value={item.status}
                           onChange={(e) => handleUpdateEntry(item.id, { status: e.target.value })}
-                          className="bg-[#181818] border border-[#2A2A2A] rounded px-2 py-1 text-xs text-white"
+                          className="bg-[#18181C] border border-[#27272A] rounded px-2 py-1 text-xs text-white"
                         >
                           {WATCH_STATUS_OPTIONS.map((o) => (
-                            <option key={o.value} value={o.value}>{o.label}</option>
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
                           ))}
                         </select>
                       </td>
                       <td className="py-3 pr-4 font-mono text-xs tabular-nums">
                         <div className="inline-flex items-center gap-2">
-                          <span>{item.episodesWatched}/{item.totalEpisodes ?? '?'}</span>
+                          <span>
+                            {item.episodesWatched}/{item.totalEpisodes ?? '?'}
+                          </span>
                           <button
                             type="button"
-                            onClick={() => handleUpdateEntry(item.id, { episodesWatched: item.episodesWatched + 1 })}
-                            className="px-2 py-0.5 border border-[#2A2A2A] rounded hover:border-white"
+                            onClick={() =>
+                              handleUpdateEntry(item.id, {
+                                episodesWatched: item.episodesWatched + 1,
+                              })
+                            }
+                            className="px-2 py-0.5 border border-[#27272A] rounded hover:border-white/70"
                           >
                             +1 Ep
                           </button>
@@ -529,11 +601,13 @@ export function AnimeWatchlistPage({ guildId, onToast }: AnimeWatchlistPageProps
                               personalRating: e.target.value ? Number(e.target.value) : null,
                             })
                           }
-                          className="bg-[#181818] border border-[#2A2A2A] rounded px-2 py-1 text-xs text-white font-mono"
+                          className="bg-[#18181C] border border-[#27272A] rounded px-2 py-1 text-xs text-white font-mono"
                         >
                           <option value="">—</option>
                           {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((n) => (
-                            <option key={n} value={n}>{n}/10</option>
+                            <option key={n} value={n}>
+                              {n}/10
+                            </option>
                           ))}
                         </select>
                       </td>
@@ -542,7 +616,7 @@ export function AnimeWatchlistPage({ guildId, onToast }: AnimeWatchlistPageProps
                           type="button"
                           aria-label={`Remove ${item.titleSnapshot}`}
                           onClick={() => handleDeleteEntry(item.id)}
-                          className="p-1.5 text-[#A0A0A0] hover:text-red-400"
+                          className="p-1.5 text-[#A1A1AA] hover:text-red-400"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -558,16 +632,19 @@ export function AnimeWatchlistPage({ guildId, onToast }: AnimeWatchlistPageProps
 
       {/* Guild Anime Command Configuration */}
       {animeConfig && (
-        <form onSubmit={handleSaveAnimeConfig} className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-5 flex flex-wrap items-end gap-4">
+        <form
+          onSubmit={handleSaveAnimeConfig}
+          className="bg-[#111114] border border-[#27272A] rounded-lg p-5 flex flex-wrap items-end gap-4"
+        >
           <div>
-            <label htmlFor="anime-locale" className="block text-xs text-[#A0A0A0] mb-1">
+            <label htmlFor="anime-locale" className="block text-xs text-[#A1A1AA] mb-1">
               Hoshika Metadata Locale
             </label>
             <select
               id="anime-locale"
               value={animeConfig.locale}
               onChange={(e) => setAnimeConfig({ ...animeConfig, locale: e.target.value })}
-              className="bg-[#181818] border border-[#2A2A2A] rounded-md px-3 py-2 text-sm text-white"
+              className="bg-[#18181C] border border-[#27272A] rounded-md px-3 py-2 text-sm text-white"
             >
               <option value="en">English (en)</option>
               <option value="ja">Japanese (ja)</option>
@@ -581,12 +658,17 @@ export function AnimeWatchlistPage({ guildId, onToast }: AnimeWatchlistPageProps
             <input
               type="checkbox"
               checked={animeConfig.showAniScrollLinks}
-              onChange={(e) => setAnimeConfig({ ...animeConfig, showAniScrollLinks: e.target.checked })}
+              onChange={(e) =>
+                setAnimeConfig({ ...animeConfig, showAniScrollLinks: e.target.checked })
+              }
               className="accent-white"
             />
             <span>Include Verified AniScroll Links</span>
           </label>
-          <button type="submit" className="px-4 py-2 text-xs font-semibold bg-white text-black rounded-md">
+          <button
+            type="submit"
+            className="px-4 py-2 text-xs font-semibold bg-white text-black rounded-md hover:bg-[#E4E4E7]"
+          >
             Save Anime Settings
           </button>
         </form>

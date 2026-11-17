@@ -392,6 +392,11 @@ export function createApiV1Router(): Router {
       const bot = getBotRuntime().getDiagnostics();
       const music = musicService.getStatus();
 
+      const recommendations = db.getCommunityRecommendationStats(
+        guild.discordGuildId,
+        appConfig.ANISCROLL_WEB_BASE_URL
+      );
+
       res.json({
         ok: true,
         guild,
@@ -403,14 +408,28 @@ export function createApiV1Router(): Router {
           activeWarningsCount: warnings.length,
           openTicketsCount: tickets.filter((t) => t.status !== 'CLOSED').length,
           suggestionsCount: suggestions.length,
+          recommendationsCount: recommendations.totalRecommendations,
           activeMusicQueues: music.activeGuildQueues,
           uptimeSeconds: Math.floor(process.uptime()),
+        },
+        analytics: {
+          topCommands: analytics.topCommands.slice(0, 5),
+          popularGenres: analytics.popularGenres.slice(0, 5),
         },
         recentEvents: auditLogs.slice(0, 12),
         system: {
           botStatus: bot.status,
+          botTag: bot.tag,
+          pingMs: bot.pingMs,
+          commandCount: bot.commandCount,
+          hasGuildMembersIntent: bot.hasGuildMembersIntent,
+          hasMessageContentIntent: bot.hasMessageContentIntent,
+          guildMemberAddListenerCount: bot.guildMemberAddListenerCount,
+          lastCommandSync: bot.lastCommandSync,
           lavalinkConnected: music.connected,
+          lavalinkStatusLabel: music.statusLabel,
           hoshikaLastError: hoshikaClient.getHealthState().lastError,
+          websiteWatchlistConfigured: getWebsiteWatchlistService().getDiagnostics().configured,
         },
       });
     } catch (err) {

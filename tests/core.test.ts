@@ -73,6 +73,7 @@ test('Discord command registry registers all required modules and valid slash JS
     'suggest',
     'ticket',
     'giveaway',
+    'rules',
   ];
   for (const name of expected) {
     const cmd = registry.get(name);

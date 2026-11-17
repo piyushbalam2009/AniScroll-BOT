@@ -133,7 +133,7 @@ export default function App() {
 
   if (!session) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center text-sm text-[#A0A0A0]">
+      <div className="min-h-screen bg-[#09090B] text-white flex items-center justify-center text-sm text-[#A1A1AA]">
         Loading AniScroll Bot...
       </div>
     );
@@ -143,25 +143,33 @@ export default function App() {
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-5 right-5 z-50 bg-[#181818] border border-white/30 text-white text-xs px-4 py-2.5 rounded-md shadow-lg"
+      className="fixed bottom-5 right-5 z-50 bg-[#18181C] border border-[#3F3F46] text-white text-xs px-4 py-2.5 rounded-md shadow-lg"
     >
       {toast}
     </div>
   ) : null;
 
-  if (path === '/') {
+  if (!session.authenticated || !session.user) {
+    if (path === '/') {
+      return (
+        <>
+          <LandingPage onNavigate={navigate} health={health} authenticated={false} />
+          {toastBanner}
+        </>
+      );
+    }
     return (
       <>
-        <LandingPage onNavigate={navigate} health={health} authenticated={session.authenticated} />
+        <LoginPage session={session} onAuthSuccess={refreshSessionAndGuilds} onNavigate={navigate} />
         {toastBanner}
       </>
     );
   }
 
-  if (path === '/login' || !session.authenticated || !session.user) {
+  if (path === '/') {
     return (
       <>
-        <LoginPage session={session} onAuthSuccess={refreshSessionAndGuilds} onNavigate={navigate} />
+        <LandingPage onNavigate={navigate} health={health} authenticated={session.authenticated} />
         {toastBanner}
       </>
     );
@@ -202,11 +210,11 @@ export default function App() {
         subtitle={meta.subtitle}
       >
         {!activeGuild ? (
-          <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-6 text-sm text-[#A0A0A0]">
+          <div className="bg-[#111114] border border-[#27272A] rounded-lg p-6 text-sm text-[#A1A1AA]">
             No manageable servers found.
           </div>
         ) : activeRoute === '/dashboard' ? (
-          <OverviewPage guildId={activeGuild.discordGuildId} onToast={showToast} />
+          <OverviewPage guildId={activeGuild.discordGuildId} onNavigate={navigate} onToast={showToast} />
         ) : activeRoute === '/moderation' ? (
           <ModerationPage guildId={activeGuild.discordGuildId} onToast={showToast} />
         ) : activeRoute === '/community' ? (
