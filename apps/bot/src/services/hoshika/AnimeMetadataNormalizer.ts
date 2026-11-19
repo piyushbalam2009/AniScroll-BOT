@@ -196,8 +196,28 @@ export class AnimeMetadataNormalizer {
     });
   }
 
+  public static validateHttpsImageUrl(url: string | null | undefined): string | null {
+    if (typeof url !== 'string') return null;
+    const trimmed = url.trim();
+    if (!trimmed || !/^https:\/\//i.test(trimmed)) return null;
+    try {
+      const parsed = new URL(trimmed);
+      return parsed.protocol === 'https:' ? parsed.toString() : null;
+    } catch {
+      return null;
+    }
+  }
+
+  public static cleanCharacterDescription(rawDesc: string | null | undefined): string | null {
+    if (typeof rawDesc !== 'string') return null;
+    const withSpoilers = rawDesc.replace(/~!([\s\S]*?)!~/g, '||$1||');
+    return AnimeMetadataNormalizer.cleanSynopsis(withSpoilers);
+  }
+
   public static normalizeCharacter(raw: any): NormalizedCharacter {
-    const ch = raw?.character || raw;
+    const ch = raw?.character && typeof raw.character === 'object' ? raw.character : raw;
+    const webBase = appConfig.ANISCROLL_WEB_BASE_URL;
+
     const rawAppearances =
       raw?.appearances?.anime ||
       ch?.appearances?.anime ||
@@ -214,21 +234,91 @@ export class AnimeMetadataNormalizer {
         }
       }
     }
+    const primaryName =
+      typeof ch?.name === 'string' && ch.name.trim()
+        ? ch.name.trim()
+        : typeof raw?.name === 'string' && raw.name.trim()
+        ? raw.name.trim()
+        : 'Unknown Character';
+    if (typeof raw?.name === 'string' && raw.name.trim() && raw.name.trim() !== primaryName) {
+      altNames.add(raw.name.trim());
+    }
+
+    const rawSeiyuu =
+      (Array.isArray(raw?.seiyuu) ? raw.seiyuu : null) ||
+      (Array.isArray(ch?.seiyuu) ? ch.seiyuu : null) ||
+      (Array.isArray(raw?.voiceActors) ? raw.voiceActors : null) ||
+      (Array.isArray(ch?.voiceActors) ? ch.voiceActors : []);
+
+    const voiceActors = rawSeiyuu
+      .filter((va: any) => Boolean(va && typeof va.name === 'string' && va.name.trim()))
+      .map((va: any) => ({
+        id: va.id ? String(va.id) : undefined,
+        name: String(va.name).trim(),
+        language: typeof va.language === 'string' && va.language.trim() ? va.language.trim() : null,
+        avatar: AnimeMetadataNormalizer.validateHttpsImageUrl(va.avatar || va.avatarUrl || va.image || null),
+        jp: typeof va.jp === 'boolean' ? va.jp : undefined,
+      }));
+
+    const appearances = Array.isArray(rawAppearances)
+      ? rawAppearances
+          .filter((a: any) => Boolean(a && (a.title || a.anime?.titleEnglish || a.anime?.titleRomaji)))
+          .map((a: any) => {
+            const shortId = normalizeHoshikaShortId(a.shortId ?? a.anime?.shortId);
+            return {
+              shortId,
+              slug: typeof a.slug === 'string' ? a.slug : typeof a.anime?.slug === 'string' ? a.anime.slug : undefined,
+              title: String(a.title || a.anime?.titleEnglish || a.anime?.titleRomaji || 'Unknown').trim(),
+              role: typeof a.role === 'string' && a.role.trim() ? a.role.trim() : null,
+              coverImage: AnimeMetadataNormalizer.validateHttpsImageUrl(
+                a.coverImage || a.anime?.coverImage || null
+              ),
+              aniscrollUrl: buildAniScrollAnimeUrl(shortId, webBase),
+            };
+          })
+      : [];
+
+    let dateOfBirth: string | null = null;
+    const rawDob = ch?.dateOfBirth ?? ch?.dob ?? null;
+    if (typeof rawDob === 'string' && rawDob.trim()) {
+      dateOfBirth = rawDob.trim();
+    } else if (rawDob && typeof rawDob === 'object') {
+      const parts = [rawDob.year, rawDob.month, rawDob.day].filter((p) => p !== null && p !== undefined);
+      if (parts.length > 0) {
+        dateOfBirth = parts.map((p) => String(p).padStart(2, '0')).join('-');
+      }
+    }
+
+    const cleanStr = (val: unknown): string | null =>
+      typeof val === 'string' && val.trim() ? val.trim() : null;
+    const cleanNum = (val: unknown): number | null =>
+      typeof val === 'number' && Number.isFinite(val) ? val : null;
+    const cleanAge = (val: unknown): string | number | null => {
+      if (typeof val === 'number' && Number.isFinite(val)) return val;
+      if (typeof val === 'string' && val.trim()) return val.trim();
+      return null;
+    };
 
     return {
-      id: String(ch?.id ?? ''),
-      name: ch?.name || 'Unknown Character',
-      nativeName: ch?.nativeName || ch?.nameJapanese || ch?.sub || null,
+      id: String(ch?.id ?? raw?.id ?? ''),
+      name: primaryName,
+      nativeName: cleanStr(ch?.nativeName) || cleanStr(ch?.nameJapanese) || cleanStr(raw?.sub) || null,
       alternativeNames: Array.from(altNames),
-      image: ch?.avatarUrl || ch?.image || ch?.avatar || null,
-      description: ch?.description || ch?.bio || null,
-      appearances: Array.isArray(rawAppearances)
-        ? rawAppearances.map((a: any) => ({
-            shortId: a.shortId ?? a.anime?.shortId,
-            title: a.title || a.anime?.titleEnglish || a.anime?.titleRomaji || 'Unknown',
-            role: a.role ?? null,
-          }))
-        : [],
+      image: AnimeMetadataNormalizer.validateHttpsImageUrl(
+        ch?.avatarUrl || ch?.image || ch?.avatar || raw?.image || null
+      ),
+      description: AnimeMetadataNormalizer.cleanCharacterDescription(ch?.description || ch?.bio || null),
+      gender: cleanStr(ch?.gender),
+      age: cleanAge(ch?.age),
+      dateOfBirth,
+      bloodType: cleanStr(ch?.bloodType),
+      occupation: cleanStr(ch?.occupation),
+      species: cleanStr(ch?.species),
+      role: cleanStr(ch?.role) || cleanStr(raw?.role),
+      favourites: cleanNum(ch?.favourites),
+      popularity: cleanNum(ch?.popularity),
+      voiceActors,
+      appearances,
     };
   }
 }

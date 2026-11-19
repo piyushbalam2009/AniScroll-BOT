@@ -17,6 +17,9 @@ export async function runCommandDeployment() {
   if (!subcommands.includes('recommendation')) {
     throw new Error('Missing /anime recommendation subcommand in registry.');
   }
+  if (!subcommands.includes('daily')) {
+    throw new Error('Missing /anime daily subcommand in registry.');
+  }
   if (subcommands.includes('recommendations')) {
     throw new Error('Obsolete /anime recommendations subcommand is still present in registry.');
   }
@@ -30,11 +33,26 @@ export async function runCommandDeployment() {
     throw new Error('Obsolete /aniquiz command is still present in registry.');
   }
 
+  const charCmd = payload.find((c) => c.name === 'character');
+  if (!charCmd) {
+    throw new Error('Missing /character command in registry.');
+  }
+  const charSubcommands = (charCmd.options || []).map((o: any) => o.name);
+  if (!charSubcommands.includes('search')) {
+    throw new Error('Missing /character search subcommand in registry.');
+  }
+
+  const names = payload.map((c) => c.name);
+  if (new Set(names).size !== names.length) {
+    throw new Error('Duplicate slash command names detected in registry.');
+  }
+
   const recSub = (animeCmd.options || []).find((o: any) => o.name === 'recommendation') as any;
   log.info(
     {
       totalCommands: payload.length,
       animeSubcommands: subcommands,
+      characterSubcommands: charSubcommands,
       recommendationSubcommand: {
         name: recSub?.name,
         description: recSub?.description,
@@ -54,6 +72,7 @@ export async function runCommandDeployment() {
   return {
     totalCommands: payload.length,
     animeSubcommands: subcommands,
+    characterSubcommands: charSubcommands,
     recommendationSubcommand: recSub,
     syncResult,
   };

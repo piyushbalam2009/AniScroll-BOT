@@ -3,6 +3,7 @@ import { getDatabase } from '../../../../../packages/database/src';
 import { createModuleLogger } from '../../../../../packages/shared/src';
 import { createMonochromeEmbed, createAnimeEmbed } from '../../../../../packages/discord-ui/src';
 import { getAnimeServices } from '../hoshika';
+import { DailyAnimeService } from '../anime/DailyAnimeService';
 
 const log = createModuleLogger('SchedulerService');
 
@@ -107,6 +108,15 @@ export class SchedulerService {
     db.sqlite
       .prepare('UPDATE moderation_cases SET active = 0 WHERE active = 1 AND expires_at IS NOT NULL AND expires_at <= ?')
       .run(nowIso);
+
+    // 5. Post scheduled Daily Anime for due guilds
+    if (client) {
+      const { animeService } = getAnimeServices();
+      const dailyAnimeService = new DailyAnimeService(db, animeService);
+      await dailyAnimeService.processDueGuilds(client, new Date()).catch((err) => {
+        log.warn({ err: err instanceof Error ? err.message : String(err) }, 'Daily anime scheduler pass error');
+      });
+    }
   }
 
   public async pickAnimeOfTheDay() {

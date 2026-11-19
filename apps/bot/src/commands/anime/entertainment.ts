@@ -26,33 +26,6 @@ export const animeEntertainmentCommands: BotSlashCommand[] = [
     },
   },
   {
-    name: 'character',
-    category: 'anime',
-    cooldownSeconds: 4,
-    data: new SlashCommandBuilder()
-      .setName('character')
-      .setDescription('Search anime character metadata via Hoshika')
-      .addStringOption((o) => o.setName('name').setDescription('Character name').setRequired(true)),
-    async execute(interaction, ctx) {
-      await interaction.deferReply();
-      const name = interaction.options.getString('name', true);
-      const { character } = await ctx.animeService.searchCharacters(name);
-      const embed = createMonochromeEmbed({
-        title: character.name,
-        description: character.description ? character.description.slice(0, 750) : 'No biography provided.',
-      });
-      if (character.image) embed.setThumbnail(character.image);
-      if (character.nativeName) embed.addFields({ name: 'Native Name', value: character.nativeName, inline: true });
-      if (character.appearances.length > 0) {
-        embed.addFields({
-          name: 'Appearances',
-          value: character.appearances.slice(0, 6).map((a) => `${a.title}${a.role ? ` (${a.role})` : ''}`).join('\n'),
-        });
-      }
-      await interaction.editReply({ embeds: [embed] });
-    },
-  },
-  {
     name: 'profile',
     category: 'community',
     cooldownSeconds: 4,

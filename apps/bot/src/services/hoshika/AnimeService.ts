@@ -640,10 +640,14 @@ export class AnimeService {
     if (!cleanId) {
       throw new AppError(ERROR_CODES.VALIDATION_ERROR, 'Character ID cannot be empty.', 400);
     }
-    const raw = await this.client.get<unknown>(`/character/${encodeURIComponent(cleanId)}`, {
-      params: { locale },
+    const requestedLocale = (locale || 'en').trim() || 'en';
+    const res = await this.animeCache.getOrFetchCharacterDetails(cleanId, requestedLocale, async () => {
+      const raw = await this.client.get<unknown>(`/character/${encodeURIComponent(cleanId)}`, {
+        params: { locale: requestedLocale },
+      });
+      return AnimeMetadataNormalizer.normalizeCharacter(raw);
     });
-    return AnimeMetadataNormalizer.normalizeCharacter(raw);
+    return res.data;
   }
 
   public async getRandomCharacterGuessPool(options?: {

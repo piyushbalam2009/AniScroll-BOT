@@ -8,6 +8,7 @@ import {
   DEFAULT_GUILD_SETTINGS,
   ERROR_CODES,
   ModerationAction,
+  NormalizedAnime,
   NotificationType,
   SuggestionStatus,
   TicketCategory,
@@ -254,6 +255,44 @@ export interface StatusConfigRecord {
   pingRoleId: string | null;
   timezone: string;
   updatedAt: string;
+}
+
+export interface DailyAnimeConfigRecord {
+  discordGuildId: string;
+  enabled: boolean;
+  channelId: string | null;
+  hour: number;
+  minute: number;
+  timezone: string;
+  updatedAt: string;
+}
+
+export type DailyAnimeStatus = 'PENDING' | 'POSTING' | 'POSTED' | 'FAILED';
+
+export interface DailyAnimeRecord {
+  id: string;
+  discordGuildId: string;
+  dateKey: string;
+  hoshikaShortId: number;
+  hoshikaId: string;
+  title: string;
+  animeSnapshot: NormalizedAnime;
+  channelId: string | null;
+  messageId: string | null;
+  status: DailyAnimeStatus;
+  errorMessage: string | null;
+  postedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DailyAnimeHistoryRecord {
+  id: string;
+  discordGuildId: string;
+  dateKey: string;
+  hoshikaShortId: number;
+  animeTitle: string;
+  recommendedAt: string;
 }
 
 export class AniScrollDatabase {
@@ -602,6 +641,47 @@ export class AniScrollDatabase {
         timezone TEXT NOT NULL DEFAULT 'Asia/Kolkata',
         updated_at TEXT NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS daily_anime_configs (
+        discord_guild_id TEXT PRIMARY KEY,
+        enabled INTEGER NOT NULL DEFAULT 0,
+        channel_id TEXT,
+        hour INTEGER NOT NULL DEFAULT 9,
+        minute INTEGER NOT NULL DEFAULT 0,
+        timezone TEXT NOT NULL DEFAULT 'Asia/Kolkata',
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS daily_anime (
+        id TEXT PRIMARY KEY,
+        discord_guild_id TEXT NOT NULL,
+        date_key TEXT NOT NULL,
+        hoshika_short_id INTEGER NOT NULL,
+        hoshika_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        anime_snapshot_json TEXT NOT NULL,
+        channel_id TEXT,
+        message_id TEXT,
+        status TEXT NOT NULL DEFAULT 'PENDING',
+        error_message TEXT,
+        posted_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(discord_guild_id, date_key)
+      );
+      CREATE INDEX IF NOT EXISTS idx_daily_anime_guild_date ON daily_anime(discord_guild_id, date_key);
+      CREATE INDEX IF NOT EXISTS idx_daily_anime_status ON daily_anime(status, date_key);
+
+      CREATE TABLE IF NOT EXISTS daily_anime_history (
+        id TEXT PRIMARY KEY,
+        discord_guild_id TEXT NOT NULL,
+        date_key TEXT NOT NULL,
+        hoshika_short_id INTEGER NOT NULL,
+        anime_title TEXT NOT NULL,
+        recommended_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_daily_anime_history_guild_rec ON daily_anime_history(discord_guild_id, recommended_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_daily_anime_history_guild_short ON daily_anime_history(discord_guild_id, hoshika_short_id);
     `);
   }
 
@@ -2407,5 +2487,328 @@ export class AniScrollDatabase {
         );
     }
     return updated;
+  }
+
+  // ==================== DAILY ANIME ====================
+
+  public getDailyAnimeConfig(discordGuildId: string): DailyAnimeConfigRecord {
+    const row = this.sqlite
+      .prepare('SELECT * FROM daily_anime_configs WHERE discord_guild_id = ?')
+      .get(discordGuildId) as any;
+    if (row) {
+      return {
+        discordGuildId: row.discord_guild_id,
+        enabled: Boolean(row.enabled),
+        channelId: row.channel_id ?? null,
+        hour: Number(row.hour ?? 9),
+        minute: Number(row.minute ?? 0),
+        timezone: row.timezone || 'Asia/Kolkata',
+        updatedAt: row.updated_at,
+      };
+    }
+
+    const guild = this.getGuildByDiscordId(discordGuildId);
+    if (guild) {
+      const settings = this.getGuildSettings(discordGuildId);
+      return {
+        discordGuildId,
+        enabled: Boolean(settings.animeConfig.dailyEnabled),
+        channelId: settings.animeConfig.dailyChannelId ?? settings.animeConfig.aotdChannelId ?? null,
+        hour: settings.animeConfig.dailyHour ?? 9,
+        minute: settings.animeConfig.dailyMinute ?? 0,
+        timezone: settings.animeConfig.dailyTimezone || 'Asia/Kolkata',
+        updatedAt: this.now(),
+      };
+    }
+
+    return {
+      discordGuildId,
+      enabled: false,
+      channelId: null,
+      hour: 9,
+      minute: 0,
+      timezone: 'Asia/Kolkata',
+      updatedAt: this.now(),
+    };
+  }
+
+  public upsertDailyAnimeConfig(
+    discordGuildId: string,
+    patch: Partial<Omit<DailyAnimeConfigRecord, 'discordGuildId' | 'updatedAt'>>,
+    actorId = 'admin'
+  ): DailyAnimeConfigRecord {
+    const current = this.getDailyAnimeConfig(discordGuildId);
+    const nextHour =
+      patch.hour !== undefined ? Math.max(0, Math.min(23, Math.trunc(patch.hour))) : current.hour;
+    const nextMinute =
+      patch.minute !== undefined ? Math.max(0, Math.min(59, Math.trunc(patch.minute))) : current.minute;
+    const next: DailyAnimeConfigRecord = {
+      discordGuildId,
+      enabled: patch.enabled !== undefined ? Boolean(patch.enabled) : current.enabled,
+      channelId: patch.channelId !== undefined ? patch.channelId : current.channelId,
+      hour: nextHour,
+      minute: nextMinute,
+      timezone: (patch.timezone || current.timezone || 'Asia/Kolkata').trim(),
+      updatedAt: this.now(),
+    };
+
+    this.sqlite
+      .prepare(
+        `INSERT INTO daily_anime_configs (discord_guild_id, enabled, channel_id, hour, minute, timezone, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(discord_guild_id) DO UPDATE SET
+           enabled = excluded.enabled,
+           channel_id = excluded.channel_id,
+           hour = excluded.hour,
+           minute = excluded.minute,
+           timezone = excluded.timezone,
+           updated_at = excluded.updated_at`
+      )
+      .run(
+        next.discordGuildId,
+        next.enabled ? 1 : 0,
+        next.channelId,
+        next.hour,
+        next.minute,
+        next.timezone,
+        next.updatedAt
+      );
+
+    // Keep guild_settings.animeConfig synchronized if guild record exists without overwriting unrelated fields
+    const guild = this.getGuildByDiscordId(discordGuildId);
+    if (guild) {
+      const settings = this.getGuildSettings(discordGuildId);
+      this.updateGuildSettingsSection(
+        discordGuildId,
+        'animeConfig',
+        {
+          ...settings.animeConfig,
+          dailyEnabled: next.enabled,
+          dailyChannelId: next.channelId,
+          aotdChannelId: next.channelId ?? settings.animeConfig.aotdChannelId,
+          dailyHour: next.hour,
+          dailyMinute: next.minute,
+          dailyTimezone: next.timezone,
+        },
+        actorId
+      );
+    }
+
+    return next;
+  }
+
+  public listEnabledDailyAnimeConfigs(): DailyAnimeConfigRecord[] {
+    const rows = this.sqlite
+      .prepare('SELECT * FROM daily_anime_configs WHERE enabled = 1 AND channel_id IS NOT NULL')
+      .all() as any[];
+    return rows.map((row) => ({
+      discordGuildId: row.discord_guild_id,
+      enabled: Boolean(row.enabled),
+      channelId: row.channel_id,
+      hour: Number(row.hour ?? 9),
+      minute: Number(row.minute ?? 0),
+      timezone: row.timezone || 'Asia/Kolkata',
+      updatedAt: row.updated_at,
+    }));
+  }
+
+  private mapDailyAnime(r: any): DailyAnimeRecord {
+    return {
+      id: r.id,
+      discordGuildId: r.discord_guild_id,
+      dateKey: r.date_key,
+      hoshikaShortId: Number(r.hoshika_short_id),
+      hoshikaId: r.hoshika_id,
+      title: r.title,
+      animeSnapshot: JSON.parse(r.anime_snapshot_json || '{}') as NormalizedAnime,
+      channelId: r.channel_id ?? null,
+      messageId: r.message_id ?? null,
+      status: r.status as DailyAnimeStatus,
+      errorMessage: r.error_message ?? null,
+      postedAt: r.posted_at ?? null,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    };
+  }
+
+  public getDailyAnimeForDate(discordGuildId: string, dateKey: string): DailyAnimeRecord | null {
+    const row = this.sqlite
+      .prepare('SELECT * FROM daily_anime WHERE discord_guild_id = ? AND date_key = ?')
+      .get(discordGuildId, dateKey) as any;
+    return row ? this.mapDailyAnime(row) : null;
+  }
+
+  public saveDailyAnime(input: {
+    discordGuildId: string;
+    dateKey: string;
+    hoshikaShortId: number;
+    hoshikaId: string;
+    title: string;
+    animeSnapshot: NormalizedAnime;
+    status?: DailyAnimeStatus;
+    channelId?: string | null;
+    messageId?: string | null;
+    errorMessage?: string | null;
+    postedAt?: string | null;
+    overwrite?: boolean;
+  }): DailyAnimeRecord {
+    const now = this.now();
+    const id = crypto.randomUUID();
+    const status: DailyAnimeStatus = input.status || 'PENDING';
+    const snapshotJson = JSON.stringify(input.animeSnapshot);
+
+    if (input.overwrite) {
+      this.sqlite
+        .prepare(
+          `INSERT INTO daily_anime (
+             id, discord_guild_id, date_key, hoshika_short_id, hoshika_id, title, anime_snapshot_json,
+             channel_id, message_id, status, error_message, posted_at, created_at, updated_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(discord_guild_id, date_key) DO UPDATE SET
+             hoshika_short_id = excluded.hoshika_short_id,
+             hoshika_id = excluded.hoshika_id,
+             title = excluded.title,
+             anime_snapshot_json = excluded.anime_snapshot_json,
+             channel_id = COALESCE(excluded.channel_id, daily_anime.channel_id),
+             message_id = COALESCE(excluded.message_id, daily_anime.message_id),
+             status = excluded.status,
+             error_message = excluded.error_message,
+             posted_at = COALESCE(excluded.posted_at, daily_anime.posted_at),
+             updated_at = excluded.updated_at`
+        )
+        .run(
+          id,
+          input.discordGuildId,
+          input.dateKey,
+          input.hoshikaShortId,
+          input.hoshikaId,
+          input.title,
+          snapshotJson,
+          input.channelId ?? null,
+          input.messageId ?? null,
+          status,
+          input.errorMessage ?? null,
+          input.postedAt ?? null,
+          now,
+          now
+        );
+    } else {
+      this.sqlite
+        .prepare(
+          `INSERT INTO daily_anime (
+             id, discord_guild_id, date_key, hoshika_short_id, hoshika_id, title, anime_snapshot_json,
+             channel_id, message_id, status, error_message, posted_at, created_at, updated_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(discord_guild_id, date_key) DO NOTHING`
+        )
+        .run(
+          id,
+          input.discordGuildId,
+          input.dateKey,
+          input.hoshikaShortId,
+          input.hoshikaId,
+          input.title,
+          snapshotJson,
+          input.channelId ?? null,
+          input.messageId ?? null,
+          status,
+          input.errorMessage ?? null,
+          input.postedAt ?? null,
+          now,
+          now
+        );
+    }
+
+    return this.getDailyAnimeForDate(input.discordGuildId, input.dateKey)!;
+  }
+
+  public claimDailyAnimeForPosting(
+    discordGuildId: string,
+    dateKey: string,
+    channelId: string
+  ): boolean {
+    const now = this.now();
+    const staleThreshold = new Date(Date.now() - 5 * 60_000).toISOString();
+    const res = this.sqlite
+      .prepare(
+        `UPDATE daily_anime
+         SET status = 'POSTING', channel_id = ?, error_message = NULL, updated_at = ?
+         WHERE discord_guild_id = ?
+           AND date_key = ?
+           AND (status IN ('PENDING', 'FAILED') OR (status = 'POSTING' AND updated_at <= ?))`
+      )
+      .run(channelId, now, discordGuildId, dateKey, staleThreshold);
+    return res.changes === 1;
+  }
+
+  public markDailyAnimePosted(
+    discordGuildId: string,
+    dateKey: string,
+    channelId: string,
+    messageId: string | null
+  ): DailyAnimeRecord | null {
+    const now = this.now();
+    this.sqlite
+      .prepare(
+        `UPDATE daily_anime
+         SET status = 'POSTED', channel_id = ?, message_id = ?, error_message = NULL, posted_at = ?, updated_at = ?
+         WHERE discord_guild_id = ? AND date_key = ?`
+      )
+      .run(channelId, messageId, now, now, discordGuildId, dateKey);
+    return this.getDailyAnimeForDate(discordGuildId, dateKey);
+  }
+
+  public markDailyAnimeFailed(
+    discordGuildId: string,
+    dateKey: string,
+    errorMessage: string
+  ): DailyAnimeRecord | null {
+    const now = this.now();
+    this.sqlite
+      .prepare(
+        `UPDATE daily_anime
+         SET status = 'FAILED', error_message = ?, updated_at = ?
+         WHERE discord_guild_id = ? AND date_key = ?`
+      )
+      .run(errorMessage.slice(0, 500), now, discordGuildId, dateKey);
+    return this.getDailyAnimeForDate(discordGuildId, dateKey);
+  }
+
+  public recordDailyAnimeHistory(
+    discordGuildId: string,
+    dateKey: string,
+    hoshikaShortId: number,
+    animeTitle: string,
+    recommendedAt?: string
+  ): DailyAnimeHistoryRecord {
+    const id = crypto.randomUUID();
+    const ts = recommendedAt || this.now();
+    this.sqlite
+      .prepare(
+        `INSERT INTO daily_anime_history (id, discord_guild_id, date_key, hoshika_short_id, anime_title, recommended_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      )
+      .run(id, discordGuildId, dateKey, hoshikaShortId, animeTitle, ts);
+    return {
+      id,
+      discordGuildId,
+      dateKey,
+      hoshikaShortId,
+      animeTitle,
+      recommendedAt: ts,
+    };
+  }
+
+  public getRecentDailyAnimeShortIds(discordGuildId: string, days = 30): number[] {
+    const cutoff = new Date(Date.now() - Math.max(1, days) * 86_400_000).toISOString();
+    const rows = this.sqlite
+      .prepare(
+        `SELECT DISTINCT hoshika_short_id as shortId
+         FROM daily_anime_history
+         WHERE discord_guild_id = ? AND recommended_at >= ?
+         ORDER BY recommended_at DESC`
+      )
+      .all(discordGuildId, cutoff) as Array<{ shortId: number }>;
+    return rows.map((r) => Number(r.shortId)).filter((n) => Number.isInteger(n) && n > 0);
   }
 }

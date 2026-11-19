@@ -1,8 +1,13 @@
 import { ChannelType, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
-import { createModuleLogger } from '../../../../../packages/shared/src';
+import { AppError, createModuleLogger, ERROR_CODES } from '../../../../../packages/shared/src';
 import { createMonochromeEmbed } from '../../../../../packages/discord-ui/src';
 import { BotSlashCommand } from '../types';
 import { resolveAndValidateWelcomeChannel } from '../../services/welcome/WelcomeService';
+import {
+  DailyAnimeService,
+  isValidIanaTimezone,
+  validateDailyAnimeChannel,
+} from '../../services/anime/DailyAnimeService';
 
 const log = createModuleLogger('ConfigCommand');
 
@@ -77,8 +82,44 @@ export const configCommand: BotSlashCommand = {
     .addSubcommand((s) =>
       s
         .setName('anime')
-        .setDescription('Configure anime discovery & AOTD')
-        .addChannelOption((o) => o.setName('aotd_channel').setDescription('Anime of the Day channel'))
+        .setDescription('Configure anime discovery & Daily Anime auto-posting')
+        .addBooleanOption((o) =>
+          o.setName('daily_enabled').setDescription('Enable or disable automatic Daily Anime posting')
+        )
+        .addChannelOption((o) =>
+          o
+            .setName('daily_channel')
+            .setDescription('Text channel for automatic Daily Anime posts')
+            .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+        )
+        .addIntegerOption((o) =>
+          o
+            .setName('daily_hour')
+            .setDescription('Hour of day to post Daily Anime (0-23)')
+            .setMinValue(0)
+            .setMaxValue(23)
+        )
+        .addIntegerOption((o) =>
+          o
+            .setName('daily_minute')
+            .setDescription('Minute of hour to post Daily Anime (0-59)')
+            .setMinValue(0)
+            .setMaxValue(59)
+        )
+        .addStringOption((o) =>
+          o
+            .setName('daily_timezone')
+            .setDescription('IANA timezone (e.g. Asia/Kolkata, America/New_York, UTC)')
+        )
+        .addBooleanOption((o) =>
+          o.setName('test_post').setDescription('Post a live test Daily Anime message to the configured channel')
+        )
+        .addChannelOption((o) =>
+          o
+            .setName('aotd_channel')
+            .setDescription('Legacy alias for Daily Anime channel')
+            .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+        )
         .addStringOption((o) =>
           o
             .setName('locale')
@@ -115,6 +156,8 @@ export const configCommand: BotSlashCommand = {
     const settings = ctx.db.getGuildSettings(interaction.guildId);
 
     if (sub === 'overview' || sub === 'permissions') {
+      const dailyCfg = ctx.db.getDailyAnimeConfig(interaction.guildId);
+      const timeStr = `${String(dailyCfg.hour).padStart(2, '0')}:${String(dailyCfg.minute).padStart(2, '0')} (${dailyCfg.timezone})`;
       await interaction.reply({
         ephemeral: true,
         embeds: [
@@ -126,6 +169,13 @@ export const configCommand: BotSlashCommand = {
             { name: 'AutoMod', value: settings.automodConfig.enabled ? `Enabled (${settings.automodConfig.punishmentMode})` : 'Disabled', inline: true },
             { name: 'Music', value: `Vol ${settings.musicConfig.defaultVolume}% · 24/7: ${settings.musicConfig.stay247 ? 'On' : 'Off'}`, inline: true },
             { name: 'Anime Locale', value: settings.animeConfig.locale, inline: true },
+            {
+              name: 'Daily Anime',
+              value: dailyCfg.enabled
+                ? `Enabled · ${dailyCfg.channelId ? `<#${dailyCfg.channelId}>` : 'No channel'} · ${timeStr}`
+                : `Disabled · ${timeStr}`,
+              inline: true,
+            },
             { name: 'Logging', value: settings.loggingConfig.enabled ? 'Enabled' : 'Disabled', inline: true },
             { name: 'Staff Roles', value: settings.moderationConfig.staffRoleIds.length ? settings.moderationConfig.staffRoleIds.map((r) => `<@&${r}>`).join(', ') : 'Admin Only', inline: true }
           ),
@@ -236,18 +286,139 @@ export const configCommand: BotSlashCommand = {
         interaction.user.id
       );
     } else if (sub === 'anime') {
-      const ch = interaction.options.getChannel('aotd_channel');
-      const locale = interaction.options.getString('locale') as any;
-      ctx.db.updateGuildSettingsSection(
+      const dailyEnabledOpt = interaction.options.getBoolean('daily_enabled');
+      const dailyChannelOpt = interaction.options.getChannel('daily_channel');
+      const aotdChannelOpt = interaction.options.getChannel('aotd_channel');
+      const dailyHourOpt = interaction.options.getInteger('daily_hour');
+      const dailyMinuteOpt = interaction.options.getInteger('daily_minute');
+      const dailyTimezoneOpt = interaction.options.getString('daily_timezone');
+      const testPostOpt = interaction.options.getBoolean('test_post');
+      const localeOpt = interaction.options.getString('locale') as any;
+
+      const currentDaily = ctx.db.getDailyAnimeConfig(interaction.guildId);
+
+      // View mode when /config anime is run with no options
+      if (
+        dailyEnabledOpt === null &&
+        dailyChannelOpt === null &&
+        aotdChannelOpt === null &&
+        dailyHourOpt === null &&
+        dailyMinuteOpt === null &&
+        dailyTimezoneOpt === null &&
+        testPostOpt === null &&
+        localeOpt === null
+      ) {
+        const timeStr = `${String(currentDaily.hour).padStart(2, '0')}:${String(currentDaily.minute).padStart(2, '0')}`;
+        await interaction.reply({
+          ephemeral: true,
+          embeds: [
+            createMonochromeEmbed({
+              title: `Anime & Daily Anime Configuration · ${interaction.guild.name}`,
+              description: 'Use `/config anime` options to enable, schedule, or test automatic Daily Anime posts.',
+            }).addFields(
+              { name: 'Daily Anime Status', value: currentDaily.enabled ? 'Enabled' : 'Disabled', inline: true },
+              { name: 'Post Channel', value: currentDaily.channelId ? `<#${currentDaily.channelId}>` : 'Not set', inline: true },
+              { name: 'Schedule', value: `${timeStr} (${currentDaily.timezone})`, inline: true },
+              { name: 'Metadata Locale', value: settings.animeConfig.locale, inline: true }
+            ),
+          ],
+        });
+        return;
+      }
+
+      if (dailyTimezoneOpt !== null && !isValidIanaTimezone(dailyTimezoneOpt)) {
+        throw new AppError(
+          ERROR_CODES.VALIDATION_ERROR,
+          `Invalid IANA timezone "${dailyTimezoneOpt}". Examples: Asia/Kolkata, America/New_York, Europe/London, UTC.`,
+          400
+        );
+      }
+
+      if (dailyHourOpt !== null && (dailyHourOpt < 0 || dailyHourOpt > 23)) {
+        throw new AppError(ERROR_CODES.VALIDATION_ERROR, 'Daily hour must be between 0 and 23.', 400);
+      }
+      if (dailyMinuteOpt !== null && (dailyMinuteOpt < 0 || dailyMinuteOpt > 59)) {
+        throw new AppError(ERROR_CODES.VALIDATION_ERROR, 'Daily minute must be between 0 and 59.', 400);
+      }
+
+      const targetChannelId = dailyChannelOpt?.id ?? aotdChannelOpt?.id ?? currentDaily.channelId;
+      const nextEnabled = dailyEnabledOpt !== null ? dailyEnabledOpt : currentDaily.enabled;
+      const nextHour = dailyHourOpt !== null ? dailyHourOpt : currentDaily.hour;
+      const nextMinute = dailyMinuteOpt !== null ? dailyMinuteOpt : currentDaily.minute;
+      const nextTimezone = dailyTimezoneOpt !== null ? dailyTimezoneOpt.trim() : currentDaily.timezone;
+
+      if (nextEnabled && !targetChannelId) {
+        throw new AppError(
+          ERROR_CODES.VALIDATION_ERROR,
+          'Please provide `daily_channel` before enabling automatic Daily Anime posting.',
+          400
+        );
+      }
+
+      if (testPostOpt) {
+        await interaction.deferReply({ ephemeral: true });
+      }
+
+      if (targetChannelId && (nextEnabled || dailyChannelOpt || aotdChannelOpt || testPostOpt)) {
+        await validateDailyAnimeChannel(interaction.guild, targetChannelId);
+      }
+
+      if (localeOpt) {
+        ctx.db.updateGuildSettingsSection(
+          interaction.guildId,
+          'animeConfig',
+          {
+            ...settings.animeConfig,
+            locale: localeOpt,
+          },
+          interaction.user.id
+        );
+      }
+
+      const savedDaily = ctx.db.upsertDailyAnimeConfig(
         interaction.guildId,
-        'animeConfig',
         {
-          ...settings.animeConfig,
-          aotdChannelId: ch?.id ?? settings.animeConfig.aotdChannelId,
-          locale: locale ?? settings.animeConfig.locale,
+          enabled: nextEnabled,
+          channelId: targetChannelId,
+          hour: nextHour,
+          minute: nextMinute,
+          timezone: nextTimezone,
         },
         interaction.user.id
       );
+
+      let testSummary = '';
+      if (testPostOpt) {
+        const dailyService = ctx.dailyAnimeService ?? new DailyAnimeService(ctx.db, ctx.animeService);
+        const testResult = await dailyService.postDailyAnimeToGuild(interaction.client, interaction.guildId, {
+          isTest: true,
+        });
+        testSummary = testResult.ok
+          ? `\nTest post sent to <#${testResult.channelId}> (message ID \`${testResult.messageId || 'sent'}\`).`
+          : `\nTest post failed: ${testResult.reason || 'Unknown error'}`;
+      }
+
+      const timeStr = `${String(savedDaily.hour).padStart(2, '0')}:${String(savedDaily.minute).padStart(2, '0')}`;
+      const replyPayload = {
+        embeds: [
+          createMonochromeEmbed({
+            title: 'Anime Configuration Saved',
+            description:
+              `Daily Anime: **${savedDaily.enabled ? 'Enabled' : 'Disabled'}**\n` +
+              `Channel: ${savedDaily.channelId ? `<#${savedDaily.channelId}>` : 'Not set'}\n` +
+              `Schedule: **${timeStr}** (\`${savedDaily.timezone}\`)\n` +
+              `Locale: **${localeOpt ?? settings.animeConfig.locale}**` +
+              testSummary,
+          }),
+        ],
+      };
+
+      if (testPostOpt) {
+        await interaction.editReply(replyPayload);
+      } else {
+        await interaction.reply({ ...replyPayload, ephemeral: true });
+      }
+      return;
     } else if (sub === 'notifications') {
       const ch = interaction.options.getChannel('channel', true);
       ctx.db.updateGuildSettingsSection(

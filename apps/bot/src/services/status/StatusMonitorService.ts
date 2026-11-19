@@ -46,10 +46,7 @@ export class StatusMonitorService {
     // 1. AniScroll Website
     await this.checkHttpService(db, 'website', 'AniScroll Website', appConfig.ANISCROLL_WEBSITE_URL, timeout, client);
 
-    // 2. Streaming API
-    await this.checkHttpService(db, 'streaming_api', 'Streaming API', appConfig.ANISCROLL_STREAMING_API_URL, timeout, client);
-
-    // 3. Hoshika Metadata API
+    // 2. Hoshika Metadata API
     await this.checkHttpService(db, 'hoshika_api', 'Hoshika Metadata API', `${appConfig.HOSHIKA_BASE_URL.replace(/\/+$/, '')}/health`, timeout, client);
 
     // 4. Discord Bot Gateway

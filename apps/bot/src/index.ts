@@ -10,6 +10,7 @@ import { SchedulerService } from './services/jobs/SchedulerService';
 import { getMusicService } from './services/music/MusicService';
 import { getWebsiteWatchlistService } from './services/watchlist/WebsiteWatchlistService';
 import { AniGuessService, getAniGuessService } from './services/anime/AniGuessService';
+import { DailyAnimeService } from './services/anime/DailyAnimeService';
 import { getStatusMonitorService } from './services/status/StatusMonitorService';
 
 const log = createModuleLogger('BotRuntime');
@@ -148,7 +149,8 @@ export class AniScrollBotRuntime {
 
     const db = getDatabase();
     const cache = getCacheService();
-    const { animeService } = getAnimeServices();
+    const { animeService, characterService } = getAnimeServices();
+    const dailyAnimeService = new DailyAnimeService(db, animeService);
     const aniGuessService = getAniGuessService(animeService);
     this.aniGuessService = aniGuessService;
     const musicService = getMusicService();
@@ -158,6 +160,8 @@ export class AniScrollBotRuntime {
       db,
       cache,
       animeService,
+      characterService,
+      dailyAnimeService,
       aniGuessService,
       musicService,
       websiteWatchlist,

@@ -5,11 +5,15 @@ import { AnimeService } from '../services/hoshika/AnimeService';
 import { MusicService } from '../services/music/MusicService';
 import { WebsiteWatchlistService } from '../services/watchlist/WebsiteWatchlistService';
 import { AniGuessService } from '../services/anime/AniGuessService';
+import { CharacterService } from '../services/anime/CharacterService';
+import { DailyAnimeService } from '../services/anime/DailyAnimeService';
 
 export interface BotCommandContext {
   db: AniScrollDatabase;
   cache: CacheService;
   animeService: AnimeService;
+  characterService?: CharacterService;
+  dailyAnimeService?: DailyAnimeService;
   aniGuessService?: AniGuessService;
   musicService: MusicService;
   websiteWatchlist: WebsiteWatchlistService;

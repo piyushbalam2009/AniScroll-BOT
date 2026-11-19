@@ -224,6 +224,11 @@ export const animeConfigSchema = z.object({
   recommendationCooldownSeconds: z.number().int().min(3).max(600).optional().default(15),
   recommendationAnalyticsEnabled: z.boolean().optional().default(true),
   recommendationAllowedChannelIds: z.array(z.string()).optional().default([]),
+  dailyEnabled: z.boolean().optional().default(false),
+  dailyChannelId: z.string().nullable().optional().default(null),
+  dailyHour: z.number().int().min(0).max(23).optional().default(9),
+  dailyMinute: z.number().int().min(0).max(59).optional().default(0),
+  dailyTimezone: z.string().optional().default('Asia/Kolkata'),
 });
 
 export const suggestionCreateSchema = z.object({

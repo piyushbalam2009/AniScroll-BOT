@@ -11,6 +11,7 @@ import {
   createPublicRecommendationEmbed,
 } from '../../../../../packages/discord-ui/src';
 import { BotCommandContext, BotSlashCommand } from '../types';
+import { DailyAnimeService } from '../../services/anime/DailyAnimeService';
 
 // Ephemeral session cache for pagination & selection ownership
 export const animePaginationSessions = new Map<
@@ -276,13 +277,32 @@ export const animeCommand: BotSlashCommand = {
         .setName('watch')
         .setDescription('Get verified AniScroll website link for an anime')
         .addStringOption((o) => o.setName('anime').setDescription('Anime title').setRequired(true))
+    )
+    .addSubcommand((s) =>
+      s
+        .setName('daily')
+        .setDescription("Show today's featured anime recommendation")
     ),
 
   async execute(interaction, ctx) {
     const sub = interaction.options.getSubcommand();
-    const locale = interaction.guildId
-      ? ctx.db.getGuildSettings(interaction.guildId).animeConfig.locale
-      : 'en';
+    const locale =
+      interaction.guildId && ctx.db.getGuildByDiscordId(interaction.guildId)
+        ? ctx.db.getGuildSettings(interaction.guildId).animeConfig.locale
+        : 'en';
+
+    if (sub === 'daily') {
+      await interaction.deferReply({ ephemeral: true });
+      const guildKey = interaction.guildId || 'global';
+      const dailyService = ctx.dailyAnimeService ?? new DailyAnimeService(ctx.db, ctx.animeService);
+      const { record } = await dailyService.getOrCreateDailyRecommendation(guildKey, locale);
+      const payload = dailyService.buildDailyMessagePayload(record, {
+        mode: 'manual',
+        ownerUserId: interaction.user.id,
+      });
+      await interaction.editReply(payload);
+      return;
+    }
 
     if (sub === 'recommendation') {
       const rawAnimeName = interaction.options.getString('anime_name', true);

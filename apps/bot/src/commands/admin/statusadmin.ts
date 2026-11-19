@@ -5,7 +5,6 @@ import { createMonochromeEmbed } from '../../../../../packages/discord-ui/src';
 
 const serviceChoices = [
   { name: 'AniScroll Website', value: 'website' },
-  { name: 'Streaming API', value: 'streaming_api' },
   { name: 'Hoshika Metadata API', value: 'hoshika' },
   { name: 'Discord Bot', value: 'discord_bot' },
   { name: 'Lavalink Music Node', value: 'lavalink' },
@@ -136,7 +135,7 @@ export const maintenanceCommand: BotSlashCommand = {
     if (sub === 'start') {
       const reason = interaction.options.getString('reason', true);
       const expectedEnd = interaction.options.getString('expected_end');
-      const serviceKeys = service === 'all' ? ['website', 'streaming_api', 'hoshika_api', 'discord_bot', 'lavalink'] : [service!];
+      const serviceKeys = service === 'all' ? ['website', 'hoshika_api', 'discord_bot', 'lavalink'] : [service!];
 
       for (const sk of serviceKeys) {
         db.updateServiceStatus(sk, sk, 'MAINTENANCE', 0, { reason }, reason);
@@ -157,7 +156,7 @@ export const maintenanceCommand: BotSlashCommand = {
       const reason = interaction.options.getString('reason', true);
       const startTime = interaction.options.getString('start_time', true);
       const endTime = interaction.options.getString('end_time') || 'TBD';
-      const serviceKeys = service === 'all' ? ['website', 'streaming_api', 'hoshika_api', 'discord_bot', 'lavalink'] : [service!];
+      const serviceKeys = service === 'all' ? ['website', 'hoshika_api', 'discord_bot', 'lavalink'] : [service!];
 
       db.createScheduledMaintenance(`Scheduled Maintenance: ${service}`, reason, serviceKeys, startTime, endTime);
 
@@ -170,7 +169,7 @@ export const maintenanceCommand: BotSlashCommand = {
       await announceToChannel(interaction, targetChannelId, embed);
       await interaction.reply({ content: `✅ Maintenance scheduled successfully for **${service}**!`, ephemeral: true });
     } else if (sub === 'end') {
-      const serviceKeys = service === 'all' ? ['website', 'streaming_api', 'hoshika_api', 'discord_bot', 'lavalink'] : [service!];
+      const serviceKeys = service === 'all' ? ['website', 'hoshika_api', 'discord_bot', 'lavalink'] : [service!];
 
       for (const sk of serviceKeys) {
         db.updateServiceStatus(sk, sk, 'ONLINE', 120, {}, null);

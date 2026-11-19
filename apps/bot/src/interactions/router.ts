@@ -4,6 +4,7 @@ import {
   GuildMember,
   Interaction,
   ModalSubmitInteraction,
+  PermissionFlagsBits,
   StringSelectMenuInteraction,
 } from 'discord.js';
 import {
@@ -15,8 +16,10 @@ import {
 } from '../../../../packages/shared/src';
 import {
   buildAnimeActionRows,
+  buildCharacterActionRows,
   buildMusicControlRows,
   createAnimeEmbed,
+  createCharacterEmbed,
   createErrorEmbed,
   createMonochromeEmbed,
   createNowPlayingEmbed,
@@ -29,12 +32,18 @@ import {
   publishPublicRecommendation,
 } from '../commands/anime/anime';
 import {
+  characterSearchSessions,
+  cleanupExpiredCharacterSessions,
+} from '../commands/anime/character';
+import {
   addAnimeToWebsiteWatchlist,
   watchlistAddSessions,
 } from '../commands/watchlist/watchlist';
 import { assertMusicControlAccess, musicSearchSessions } from '../commands/music/music';
 import { formatDuration } from '../services/music/MusicService';
 import { getAniGuessService } from '../services/anime/AniGuessService';
+import { DailyAnimeService } from '../services/anime/DailyAnimeService';
+import { getAnimeServices } from '../services/hoshika';
 
 const log = createModuleLogger('InteractionRouter');
 
@@ -153,6 +162,176 @@ async function handleButton(interaction: ButtonInteraction, ctx: BotCommandConte
     if (action === 'openmodal') {
       const gameId = parts[3];
       await aniGuess.handleOpenAnswerModalButton(interaction, ownerUserId, gameId);
+      return;
+    }
+  }
+
+  if (domain === 'character') {
+    const action = parts[1];
+    if (action === 'page') {
+      const [, , ownerUserId, sessionId, targetPage] = parts;
+      cleanupExpiredCharacterSessions();
+      if (interaction.user.id !== ownerUserId) {
+        throw new AppError(
+          ERROR_CODES.USER_MISSING_PERMISSIONS,
+          'Only the user who ran `/character search` can use these pagination buttons.',
+          403
+        );
+      }
+
+      const sessionKey = `${ownerUserId}:${sessionId}`;
+      const session = characterSearchSessions.get(sessionKey);
+      if (!session || Date.now() > session.expiresAt) {
+        characterSearchSessions.delete(sessionKey);
+        throw new AppError(
+          ERROR_CODES.INTERACTION_EXPIRED,
+          'This character search session has expired. Run `/character search` again.',
+          410
+        );
+      }
+
+      const nextIdx = Math.max(0, Math.min(session.results.length - 1, Number(targetPage)));
+      await interaction.deferUpdate();
+
+      const charService = ctx.characterService ?? getAnimeServices().characterService;
+      const hydrated = await charService.hydrateCharacter(session.results[nextIdx], session.locale);
+      session.results[nextIdx] = hydrated.character;
+      session.currentPage = nextIdx;
+
+      await interaction.editReply({
+        embeds: [
+          createCharacterEmbed(hydrated.character, {
+            page: nextIdx,
+            totalPages: session.results.length,
+            detailsError: hydrated.detailsError,
+          }),
+        ],
+        components: buildCharacterActionRows({
+          ownerUserId,
+          sessionId,
+          character: hydrated.character,
+          page: nextIdx,
+          totalPages: session.results.length,
+          results: session.results,
+        }),
+      });
+      return;
+    }
+  }
+
+  if (domain === 'daily') {
+    const action = parts[1];
+    const mode = parts[2];
+    if (action === 'refresh' && mode === 'manual') {
+      const guildKey = parts[3] || 'global';
+      const ownerUserId = parts[4];
+      if (interaction.user.id !== ownerUserId) {
+        throw new AppError(
+          ERROR_CODES.USER_MISSING_PERMISSIONS,
+          'Only the user who requested this Daily Anime card can refresh it.',
+          403
+        );
+      }
+
+      const rl = await ctx.cache.checkRateLimit(
+        `daily:refresh:manual:${guildKey}:${interaction.user.id}`,
+        1,
+        15
+      );
+      if (!rl.allowed) {
+        throw new AppError(
+          ERROR_CODES.RATE_LIMIT_EXCEEDED,
+          `Please wait ${rl.retryAfterSeconds}s before refreshing Daily Anime again.`,
+          429
+        );
+      }
+
+      await interaction.deferUpdate();
+      const locale =
+        guildKey !== 'global' && ctx.db.getGuildByDiscordId(guildKey)
+          ? ctx.db.getGuildSettings(guildKey).animeConfig.locale
+          : 'en';
+      const dailyService = ctx.dailyAnimeService ?? new DailyAnimeService(ctx.db, ctx.animeService);
+      try {
+        const { record } = await dailyService.getOrCreateDailyRecommendation(guildKey, locale, {
+          forceRefresh: true,
+        });
+        await interaction.editReply(
+          dailyService.buildDailyMessagePayload(record, {
+            mode: 'manual',
+            ownerUserId,
+          })
+        );
+      } catch (err) {
+        const msg =
+          err instanceof AppError
+            ? err.userMessage
+            : 'Could not refresh Daily Anime right now. Please try again shortly.';
+        await interaction.followUp({
+          ephemeral: true,
+          embeds: [createErrorEmbed(msg)],
+        });
+      }
+      return;
+    }
+
+    if (action === 'refresh' && mode === 'public') {
+      const guildKey = parts[3];
+      const dateKey = parts[4];
+      const member = interaction.member as GuildMember | null;
+      const isBotOwner = appConfig.ownerIds.includes(interaction.user.id);
+      const hasManageGuild = Boolean(
+        member &&
+          (member.permissions.has(PermissionFlagsBits.ManageGuild) ||
+            member.permissions.has(PermissionFlagsBits.Administrator))
+      );
+      if (!isBotOwner && !hasManageGuild) {
+        throw new AppError(
+          ERROR_CODES.USER_MISSING_PERMISSIONS,
+          'Only server administrators (Manage Server) can refresh the public Daily Anime post.',
+          403
+        );
+      }
+
+      const rl = await ctx.cache.checkRateLimit(
+        `daily:refresh:public:${guildKey}:${interaction.user.id}`,
+        1,
+        30
+      );
+      if (!rl.allowed) {
+        throw new AppError(
+          ERROR_CODES.RATE_LIMIT_EXCEEDED,
+          `Please wait ${rl.retryAfterSeconds}s before refreshing the public Daily Anime post.`,
+          429
+        );
+      }
+
+      await interaction.deferUpdate();
+      const locale =
+        guildKey && guildKey !== 'global' && ctx.db.getGuildByDiscordId(guildKey)
+          ? ctx.db.getGuildSettings(guildKey).animeConfig.locale
+          : 'en';
+      const dailyService = ctx.dailyAnimeService ?? new DailyAnimeService(ctx.db, ctx.animeService);
+      try {
+        const { record } = await dailyService.getOrCreateDailyRecommendation(guildKey, locale, {
+          dateKey,
+          forceRefresh: true,
+        });
+        await interaction.editReply(
+          dailyService.buildDailyMessagePayload(record, {
+            mode: 'public',
+          })
+        );
+      } catch (err) {
+        const msg =
+          err instanceof AppError
+            ? err.userMessage
+            : 'Could not refresh the public Daily Anime post right now.';
+        await interaction.followUp({
+          ephemeral: true,
+          embeds: [createErrorEmbed(msg)],
+        });
+      }
       return;
     }
   }
@@ -339,9 +518,10 @@ async function handleButton(interaction: ButtonInteraction, ctx: BotCommandConte
     const shortId = Number(parts[2]);
     await interaction.deferReply({ ephemeral: true });
 
-    const locale = interaction.guildId
-      ? ctx.db.getGuildSettings(interaction.guildId).animeConfig.locale
-      : 'en';
+    const locale =
+      interaction.guildId && ctx.db.getGuildByDiscordId(interaction.guildId)
+        ? ctx.db.getGuildSettings(interaction.guildId).animeConfig.locale
+        : 'en';
     const saved = await addAnimeToWebsiteWatchlist(ctx, interaction.user.id, shortId, {
       status: 'plan_to_watch',
       locale,
@@ -458,6 +638,58 @@ async function handleButton(interaction: ButtonInteraction, ctx: BotCommandConte
 
 async function handleSelectMenu(interaction: StringSelectMenuInteraction, ctx: BotCommandContext) {
   const [domain, action, ownerUserId, sessionId] = interaction.customId.split(':');
+
+  if (domain === 'character' && action === 'select') {
+    cleanupExpiredCharacterSessions();
+    if (interaction.user.id !== ownerUserId) {
+      throw new AppError(
+        ERROR_CODES.USER_MISSING_PERMISSIONS,
+        'Only the user who ran `/character search` can use this menu.',
+        403
+      );
+    }
+
+    const sessionKey = `${ownerUserId}:${sessionId}`;
+    const session = sessionId ? characterSearchSessions.get(sessionKey) : undefined;
+    if (!session || Date.now() > session.expiresAt) {
+      if (sessionId) characterSearchSessions.delete(sessionKey);
+      throw new AppError(
+        ERROR_CODES.INTERACTION_EXPIRED,
+        'This character search session has expired. Run `/character search` again.',
+        410
+      );
+    }
+
+    const idx = Number(interaction.values[0]);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= session.results.length) {
+      throw new AppError(ERROR_CODES.VALIDATION_ERROR, 'Invalid character selection.', 400);
+    }
+
+    await interaction.deferUpdate();
+    const charService = ctx.characterService ?? getAnimeServices().characterService;
+    const hydrated = await charService.hydrateCharacter(session.results[idx], session.locale);
+    session.results[idx] = hydrated.character;
+    session.currentPage = idx;
+
+    await interaction.editReply({
+      embeds: [
+        createCharacterEmbed(hydrated.character, {
+          page: idx,
+          totalPages: session.results.length,
+          detailsError: hydrated.detailsError,
+        }),
+      ],
+      components: buildCharacterActionRows({
+        ownerUserId,
+        sessionId,
+        character: hydrated.character,
+        page: idx,
+        totalPages: session.results.length,
+        results: session.results,
+      }),
+    });
+    return;
+  }
 
   if (domain === 'watchlist' && action === 'addselect') {
     if (interaction.user.id !== ownerUserId) {

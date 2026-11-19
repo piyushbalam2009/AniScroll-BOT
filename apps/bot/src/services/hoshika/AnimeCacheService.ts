@@ -51,6 +51,22 @@ export class AnimeCacheService {
       loader
     );
   }
+
+  public async getOrFetchCharacterSearch<T>(keySuffix: string, loader: () => Promise<T>) {
+    return this.cache.dedupe(
+      this.cache.key('character:search', keySuffix),
+      appConfig.CACHE_TTL_SEARCH_SECONDS,
+      loader
+    );
+  }
+
+  public async getOrFetchCharacterDetails<T>(characterId: string, locale: string, loader: () => Promise<T>) {
+    return this.cache.dedupe(
+      this.cache.key('character:details', `${characterId}:${locale}`),
+      appConfig.CACHE_TTL_DETAILS_SECONDS,
+      loader
+    );
+  }
 }
 
 export class AnimeIdentifierService {

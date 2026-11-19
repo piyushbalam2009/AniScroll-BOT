@@ -19,7 +19,6 @@ export const statusCommand: BotSlashCommand = {
     // Ensure all standard services are represented even before first check
     const standardKeys = [
       { key: 'website', name: 'AniScroll Website' },
-      { key: 'streaming_api', name: 'Streaming API' },
       { key: 'hoshika_api', name: 'Hoshika Metadata API' },
       { key: 'discord_bot', name: 'Discord Bot' },
       { key: 'lavalink', name: 'Lavalink Music Node' },

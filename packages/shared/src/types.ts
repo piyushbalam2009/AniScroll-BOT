@@ -219,6 +219,23 @@ export interface NormalizedEpisode {
   averageScore?: number | null;
 }
 
+export interface CharacterVoiceActor {
+  id?: string;
+  name: string;
+  language?: string | null;
+  avatar?: string | null;
+  jp?: boolean;
+}
+
+export interface CharacterAppearance {
+  shortId?: number | null;
+  slug?: string;
+  title: string;
+  role?: string | null;
+  coverImage?: string | null;
+  aniscrollUrl?: string | null;
+}
+
 export interface NormalizedCharacter {
   id: string;
   name: string;
@@ -226,11 +243,17 @@ export interface NormalizedCharacter {
   alternativeNames?: string[];
   image?: string | null;
   description?: string | null;
-  appearances: Array<{
-    shortId?: number;
-    title: string;
-    role?: string | null;
-  }>;
+  gender?: string | null;
+  age?: string | number | null;
+  dateOfBirth?: string | null;
+  bloodType?: string | null;
+  occupation?: string | null;
+  species?: string | null;
+  role?: string | null;
+  favourites?: number | null;
+  popularity?: number | null;
+  voiceActors?: CharacterVoiceActor[];
+  appearances: CharacterAppearance[];
 }
 
 export interface WelcomeConfig {
@@ -319,6 +342,11 @@ export interface AnimeConfig {
   recommendationCooldownSeconds?: number;
   recommendationAnalyticsEnabled?: boolean;
   recommendationAllowedChannelIds?: string[];
+  dailyEnabled?: boolean;
+  dailyChannelId?: string | null;
+  dailyHour?: number;
+  dailyMinute?: number;
+  dailyTimezone?: string;
 }
 
 export interface LoggingConfig {
@@ -442,6 +470,11 @@ export const DEFAULT_GUILD_SETTINGS: AllGuildSettings = {
     recommendationCooldownSeconds: 15,
     recommendationAnalyticsEnabled: true,
     recommendationAllowedChannelIds: [],
+    dailyEnabled: false,
+    dailyChannelId: null,
+    dailyHour: 9,
+    dailyMinute: 0,
+    dailyTimezone: 'Asia/Kolkata',
   },
   loggingConfig: {
     enabled: true,
